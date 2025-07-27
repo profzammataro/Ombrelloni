@@ -262,21 +262,28 @@
       }
     }
 
-    map.onclick = e => {
+    // ✅ MODIFICATO QUI: compatibilità con WebView AppInventor
+    map.addEventListener('click', e => {
       if (e.target !== map) return;
+
+      const rect = map.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
       const id = Date.now();
       const data = {
         id,
         lettini: '2',
         open: false,
-        x: e.offsetX - 70,
-        y: e.offsetY - 70,
+        x: x - 70,
+        y: y - 70,
         mtime: Date.now()
       };
+
       umbrellas.push(data);
       createUmbrella(data);
       saveUmbrella(data);
-    };
+    });
 
     cancelBtn.onclick = () => {
       modalBackdrop.style.display = 'none';
