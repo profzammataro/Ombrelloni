@@ -2,12 +2,16 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Gestione Ombrelloni Online</title>
   <style>
     body {
       margin: 0;
       font-family: sans-serif;
       background-color: #f4e7c5;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      user-select: none;
     }
 
     #map {
@@ -15,6 +19,7 @@
       height: 100vh;
       position: relative;
       cursor: crosshair;
+      -webkit-tap-highlight-color: transparent;
     }
 
     .umbrella {
@@ -34,6 +39,8 @@
       background-color: gray;
       text-align: center;
       padding: 10px;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: none;
     }
 
     .umbrella.open {
@@ -53,6 +60,15 @@
       color: black;
       user-select: none;
       z-index: 1;
+      padding: 5px;
+      -webkit-tap-highlight-color: transparent;
+      background: rgba(255,255,255,0.8);
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .date-label {
@@ -67,13 +83,15 @@
     #modal-backdrop {
       display: none;
       position: fixed;
-      top: 0; left: 0;
+      top: 0; 
+      left: 0;
       width: 100vw;
       height: 100vh;
       background: rgba(0,0,0,0.5);
       justify-content: center;
       align-items: center;
       z-index: 10;
+      -webkit-tap-highlight-color: transparent;
     }
 
     #edit-modal {
@@ -81,29 +99,65 @@
       padding: 20px;
       border-radius: 8px;
       min-width: 300px;
+      max-width: 90vw;
       box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    }
+
+    #edit-modal h3 {
+      margin-top: 0;
     }
 
     #edit-modal label {
       display: block;
-      margin: 10px 0 5px;
+      margin: 15px 0 5px;
+      font-weight: bold;
     }
 
-    #edit-modal input {
+    #edit-modal input[type="number"] {
       width: 100%;
-      padding: 6px;
+      padding: 10px;
       font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+
+    #edit-modal input[type="checkbox"] {
+      margin-right: 8px;
+      transform: scale(1.2);
     }
 
     #edit-modal-buttons {
-      margin-top: 15px;
+      margin-top: 20px;
       text-align: right;
     }
 
     #edit-modal-buttons button {
       margin-left: 10px;
-      padding: 6px 12px;
-      font-size: 14px;
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #cancel-btn {
+      background-color: #f0f0f0;
+      color: #333;
+    }
+
+    #save-btn {
+      background-color: #007bff;
+      color: white;
+    }
+
+    #cancel-btn:hover {
+      background-color: #e0e0e0;
+    }
+
+    #save-btn:hover {
+      background-color: #0056b3;
     }
   </style>
 </head>
@@ -115,8 +169,10 @@
     <div id="edit-modal">
       <h3>Modifica Ombrellone</h3>
       <label for="lettini-input">Numero lettini:</label>
-      <input type="number" id="lettini-input" min="0">
-      <label><input type="checkbox" id="open-checkbox"> Ombrellone aperto</label>
+      <input type="number" id="lettini-input" min="0" max="10">
+      <label>
+        <input type="checkbox" id="open-checkbox"> Ombrellone aperto
+      </label>
       <div id="edit-modal-buttons">
         <button id="cancel-btn">Annulla</button>
         <button id="save-btn">Salva</button>
@@ -151,6 +207,9 @@
 
     let currentEl = null;
     let umbrellas = [];
+    let isDragging = false;
+    let dragStartTime = 0;
+    let tapTimeout = null;
 
     function load() {
       onValue(ref(db, 'umbrellas'), snapshot => {
@@ -200,7 +259,12 @@
 
       const dateLabel = document.createElement('div');
       dateLabel.className = 'date-label';
-      dateLabel.textContent = date.toLocaleString();
+      dateLabel.textContent = date.toLocaleString('it-IT', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
 
       el.appendChild(deleteBtn);
       el.appendChild(dateLabel);
@@ -210,44 +274,142 @@
 
     function addListeners(el) {
       const deleteBtn = el.querySelector('.delete-btn');
-      deleteBtn.onclick = e => {
+      
+      // Gestione del pulsante elimina
+      deleteBtn.addEventListener('touchstart', e => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+
+      deleteBtn.addEventListener('touchend', e => {
+        e.preventDefault();
         e.stopPropagation();
         deleteUmbrella(el.dataset.id);
-      };
+      });
 
-      el.onclick = e => {
-        if (e.target.closest('.delete-btn')) return;
-        currentEl = el;
-        lettiniInput.value = el.dataset.lettini;
-        openCheckbox.checked = el.dataset.open === 'true';
-        modalBackdrop.style.display = 'flex';
-      };
-
-      el.onpointerdown = e => {
+      deleteBtn.addEventListener('click', e => {
         e.preventDefault();
-        const startX = e.clientX, startY = e.clientY;
-        const origX = parseInt(el.style.left), origY = parseInt(el.style.top);
-        el.setPointerCapture(e.pointerId);
-        const dragSpeed = 1.5;
-        const move = ev => {
-          const dx = (ev.clientX - startX) * dragSpeed;
-          const dy = (ev.clientY - startY) * dragSpeed;
-          el.style.left = origX + dx + 'px';
-          el.style.top = origY + dy + 'px';
-        };
-        const up = () => {
-          el.releasePointerCapture(e.pointerId);
-          el.removeEventListener('pointermove', move);
-          el.removeEventListener('pointerup', up);
+        e.stopPropagation();
+        deleteUmbrella(el.dataset.id);
+      });
+
+      // Variabili per la gestione del touch
+      let touchStartX = 0;
+      let touchStartY = 0;
+      let elementStartX = 0;
+      let elementStartY = 0;
+      let hasMoved = false;
+      let touchStartTime = 0;
+
+      // Gestione eventi touch per l'ombrellone
+      el.addEventListener('touchstart', e => {
+        if (e.target.closest('.delete-btn')) return;
+        
+        e.preventDefault();
+        const touch = e.touches[0];
+        touchStartX = touch.clientX;
+        touchStartY = touch.clientY;
+        elementStartX = parseInt(el.style.left);
+        elementStartY = parseInt(el.style.top);
+        hasMoved = false;
+        touchStartTime = Date.now();
+        isDragging = false;
+      });
+
+      el.addEventListener('touchmove', e => {
+        if (e.target.closest('.delete-btn')) return;
+        
+        e.preventDefault();
+        const touch = e.touches[0];
+        const deltaX = touch.clientX - touchStartX;
+        const deltaY = touch.clientY - touchStartY;
+        
+        // Se il movimento è significativo, inizia il drag
+        if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+          hasMoved = true;
+          isDragging = true;
+          el.style.left = (elementStartX + deltaX) + 'px';
+          el.style.top = (elementStartY + deltaY) + 'px';
+        }
+      });
+
+      el.addEventListener('touchend', e => {
+        if (e.target.closest('.delete-btn')) return;
+        
+        e.preventDefault();
+        const touchDuration = Date.now() - touchStartTime;
+        
+        if (hasMoved && isDragging) {
+          // Era un drag, salva la posizione
           el.dataset.mtime = Date.now();
           updateData(el, true);
           render(el);
           const idx = umbrellas.findIndex(u => u.id == el.dataset.id);
           if (idx !== -1) saveUmbrella(umbrellas[idx]);
+        } else if (!hasMoved && touchDuration < 300) {
+          // Era un tap veloce, apri il modal
+          openEditModal(el);
+        }
+        
+        isDragging = false;
+        hasMoved = false;
+      });
+
+      // Fallback per desktop (mouse events)
+      el.addEventListener('mousedown', e => {
+        if (e.target.closest('.delete-btn')) return;
+        
+        e.preventDefault();
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const origX = parseInt(el.style.left);
+        const origY = parseInt(el.style.top);
+        let mouseMoved = false;
+        
+        const handleMouseMove = ev => {
+          mouseMoved = true;
+          isDragging = true;
+          const dx = ev.clientX - startX;
+          const dy = ev.clientY - startY;
+          el.style.left = origX + dx + 'px';
+          el.style.top = origY + dy + 'px';
         };
-        el.addEventListener('pointermove', move);
-        el.addEventListener('pointerup', up);
-      };
+        
+        const handleMouseUp = () => {
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
+          
+          if (mouseMoved) {
+            el.dataset.mtime = Date.now();
+            updateData(el, true);
+            render(el);
+            const idx = umbrellas.findIndex(u => u.id == el.dataset.id);
+            if (idx !== -1) saveUmbrella(umbrellas[idx]);
+          } else {
+            // Era un click senza movimento
+            openEditModal(el);
+          }
+          
+          setTimeout(() => { isDragging = false; }, 100);
+        };
+        
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+      });
+    }
+
+    function openEditModal(el) {
+      if (isDragging) return; // Non aprire il modal se si sta trascinando
+      
+      currentEl = el;
+      lettiniInput.value = el.dataset.lettini;
+      openCheckbox.checked = el.dataset.open === 'true';
+      modalBackdrop.style.display = 'flex';
+      
+      // Focus sull'input per migliorare l'usabilità mobile
+      setTimeout(() => {
+        lettiniInput.focus();
+      }, 100);
     }
 
     function updateData(el, posOnly = false) {
@@ -262,47 +424,134 @@
       }
     }
 
-    // ✅ MODIFICATO QUI: compatibilità con WebView AppInventor
-    map.addEventListener('click', e => {
-      if (e.target !== map) return;
-
-      const rect = map.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-
-      const id = Date.now();
+    // Gestione creazione ombrelloni
+    function createNewUmbrella(x, y) {
+      const id = Date.now() + Math.random(); // Aggiunto random per evitare conflitti
       const data = {
         id,
         lettini: '2',
         open: false,
-        x: x - 70,
-        y: y - 70,
+        x: Math.max(0, Math.min(x - 70, window.innerWidth - 140)),
+        y: Math.max(0, Math.min(y - 70, window.innerHeight - 140)),
         mtime: Date.now()
       };
 
       umbrellas.push(data);
       createUmbrella(data);
       saveUmbrella(data);
+    }
+
+    // Eventi per la creazione di ombrelloni
+    map.addEventListener('touchstart', e => {
+      if (e.target !== map) return;
+      e.preventDefault();
+      
+      // Memorizza la posizione del touch
+      map.touchStartX = e.touches[0].clientX;
+      map.touchStartY = e.touches[0].clientY;
+      map.touchStartTime = Date.now();
     });
 
-    cancelBtn.onclick = () => {
-      modalBackdrop.style.display = 'none';
-      currentEl = null;
-    };
+    map.addEventListener('touchend', e => {
+      if (e.target !== map) return;
+      e.preventDefault();
+      
+      const touchDuration = Date.now() - map.touchStartTime;
+      const touch = e.changedTouches[0];
+      const deltaX = Math.abs(touch.clientX - map.touchStartX);
+      const deltaY = Math.abs(touch.clientY - map.touchStartY);
+      
+      // Solo se è un tap veloce e senza movimento
+      if (touchDuration < 300 && deltaX < 10 && deltaY < 10) {
+        const rect = map.getBoundingClientRect();
+        const x = touch.clientX - rect.left;
+        const y = touch.clientY - rect.top;
+        createNewUmbrella(x, y);
+      }
+    });
 
-    saveBtn.onclick = () => {
+    map.addEventListener('click', e => {
+      if (e.target !== map) return;
+      
+      const rect = map.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      createNewUmbrella(x, y);
+    });
+
+    // Gestione pulsanti modal
+    function saveModalChanges() {
       if (!currentEl) return;
+      
       currentEl.dataset.lettini = lettiniInput.value || '2';
       currentEl.dataset.open = openCheckbox.checked;
       currentEl.dataset.mtime = Date.now();
       updateData(currentEl);
       render(currentEl);
+      
       const idx = umbrellas.findIndex(u => u.id == currentEl.dataset.id);
       if (idx !== -1) saveUmbrella(umbrellas[idx]);
+      
       modalBackdrop.style.display = 'none';
       currentEl = null;
-    };
+    }
 
+    function closeModal() {
+      modalBackdrop.style.display = 'none';
+      currentEl = null;
+    }
+
+    // Eventi per i pulsanti
+    cancelBtn.addEventListener('touchend', e => {
+      e.preventDefault();
+      closeModal();
+    });
+
+    cancelBtn.addEventListener('click', closeModal);
+
+    saveBtn.addEventListener('touchend', e => {
+      e.preventDefault();
+      saveModalChanges();
+    });
+
+    saveBtn.addEventListener('click', saveModalChanges);
+
+    // Chiudi modal toccando il backdrop
+    modalBackdrop.addEventListener('touchend', e => {
+      if (e.target === modalBackdrop) {
+        e.preventDefault();
+        closeModal();
+      }
+    });
+
+    modalBackdrop.addEventListener('click', e => {
+      if (e.target === modalBackdrop) {
+        closeModal();
+      }
+    });
+
+    // Gestione tasto Enter nel modal
+    lettiniInput.addEventListener('keypress', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        saveModalChanges();
+      }
+    });
+
+    // Previeni il comportamento di default per alcuni eventi iOS
+    document.addEventListener('touchstart', e => {
+      if (e.touches.length > 1) {
+        e.preventDefault(); // Previeni zoom con due dita
+      }
+    }, { passive: false });
+
+    document.addEventListener('touchmove', e => {
+      if (e.touches.length > 1) {
+        e.preventDefault(); // Previeni zoom con due dita
+      }
+    }, { passive: false });
+
+    // Inizializza l'app
     load();
   </script>
 </body>
