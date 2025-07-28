@@ -3,34 +3,36 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>Gestione Ombrelloni Online</title>
+  <title>Gestione Ombrelloni</title>
   <style>
-    body {
+    html, body {
       margin: 0;
+      padding: 0;
+      overflow: hidden;
       font-family: sans-serif;
       background-color: #f4e7c5;
       -webkit-user-select: none;
       -webkit-touch-callout: none;
       user-select: none;
-      overflow: hidden;
     }
-    #map-container {
+
+    #map-wrapper {
       width: 100vw;
       height: 100vh;
-      position: relative;
       overflow: hidden;
-      cursor: crosshair;
-      -webkit-tap-highlight-color: transparent;
+      position: relative;
+      touch-action: none;
     }
+
     #map {
-      width: 200vw;
-      height: 200vh;
+      width: 100%;
+      height: 100%;
       position: absolute;
       top: 0;
       left: 0;
-      transform-origin: 0 0;
-      transition: transform 0.1s ease-out;
+      transform-origin: center center;
     }
+
     .umbrella {
       width: 140px;
       height: 140px;
@@ -43,13 +45,14 @@
       font-weight: bold;
       color: #000;
       box-sizing: border-box;
-      cursor: grab;
       border: 2px solid #333;
       background-color: gray;
       text-align: center;
       padding: 10px;
+      cursor: grab;
       touch-action: none;
     }
+
     .umbrella.open { background-color: green; }
     .umbrella.closed { background-color: red; }
 
@@ -71,6 +74,7 @@
       align-items: center;
       justify-content: center;
     }
+
     .date-label {
       position: absolute;
       bottom: 2px;
@@ -80,15 +84,26 @@
       pointer-events: none;
     }
 
+    #zoom-slider {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      width: 200px;
+    }
+
     #modal-backdrop {
       display: none;
       position: fixed;
-      top: 0; left: 0;
-      width: 100vw; height: 100vh;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
       background: rgba(0,0,0,0.5);
       justify-content: center;
       align-items: center;
-      z-index: 1000;
+      z-index: 10;
     }
 
     #edit-modal {
@@ -101,7 +116,13 @@
     }
 
     #edit-modal h3 { margin-top: 0; }
-    #edit-modal label { display: block; margin: 15px 0 5px; font-weight: bold; }
+
+    #edit-modal label {
+      display: block;
+      margin: 15px 0 5px;
+      font-weight: bold;
+    }
+
     #edit-modal input[type="number"] {
       width: 100%;
       padding: 10px;
@@ -109,6 +130,7 @@
       border: 1px solid #ccc;
       border-radius: 4px;
     }
+
     #edit-modal input[type="checkbox"] {
       margin-right: 8px;
       transform: scale(1.2);
@@ -128,40 +150,26 @@
       cursor: pointer;
     }
 
-    #cancel-btn { background-color: #f0f0f0; color: #333; }
-    #save-btn { background-color: #007bff; color: white; }
+    #cancel-btn {
+      background-color: #f0f0f0;
+      color: #333;
+    }
+
+    #save-btn {
+      background-color: #007bff;
+      color: white;
+    }
+
     #cancel-btn:hover { background-color: #e0e0e0; }
     #save-btn:hover { background-color: #0056b3; }
-
-    #zoom-slider-container {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 60vw;
-      z-index: 100;
-    }
-
-    #zoom-slider {
-      width: 100%;
-      height: 30px;
-      appearance: none;
-      background: rgba(255,255,255,0.9);
-      border: 2px solid #333;
-      border-radius: 8px;
-      outline: none;
-    }
   </style>
 </head>
 <body>
-  <div id="map-container"><div id="map"></div></div>
-
-  <!-- Zoom slider -->
-  <div id="zoom-slider-container">
-    <input type="range" id="zoom-slider" min="0.5" max="3" step="0.05" value="1">
+  <div id="map-wrapper">
+    <div id="map"></div>
+    <input type="range" id="zoom-slider" min="1" max="3" step="0.1" value="1" />
   </div>
 
-  <!-- Modale -->
   <div id="modal-backdrop">
     <div id="edit-modal">
       <h3>Modifica Ombrellone</h3>
@@ -186,62 +194,95 @@
       projectId: "ombrelloni-ee9aa",
       storageBucket: "ombrelloni-ee9aa.appspot.com",
       messagingSenderId: "781899782985",
-      appId: "1:781899782985:web:a0c2039509531c1c1898"
+      appId: "1:781899782985:web:a0c2039509531c1c9c1898"
     };
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    const mapContainer = document.getElementById('map-container');
     const map = document.getElementById('map');
+    const zoomSlider = document.getElementById('zoom-slider');
     const modalBackdrop = document.getElementById('modal-backdrop');
     const lettiniInput = document.getElementById('lettini-input');
     const openCheckbox = document.getElementById('open-checkbox');
     const cancelBtn = document.getElementById('cancel-btn');
     const saveBtn = document.getElementById('save-btn');
-    const zoomSlider = document.getElementById('zoom-slider');
 
-    let currentEl = null, umbrellas = [], isDragging = false, isMapPanning = false;
-    let currentScale = 1, currentTranslateX = 0, currentTranslateY = 0, minScale = 0.5, maxScale = 3;
+    let umbrellas = [];
+    let currentEl = null;
+    let zoomLevel = 1;
+    let mapOffsetX = 0, mapOffsetY = 0;
 
     function updateMapTransform() {
-      map.style.transform = `scale(${currentScale}) translate(${currentTranslateX}px, ${currentTranslateY}px)`;
+      map.style.transform = `translate(${mapOffsetX}px, ${mapOffsetY}px) scale(${zoomLevel})`;
     }
 
-    zoomSlider.addEventListener('input', () => {
-      currentScale = parseFloat(zoomSlider.value);
+    zoomSlider.addEventListener('input', e => {
+      const oldZoom = zoomLevel;
+      zoomLevel = parseFloat(e.target.value);
+      const centerX = window.innerWidth / 2;
+      const centerY = window.innerHeight / 2;
+      mapOffsetX -= (centerX - mapOffsetX) * (zoomLevel - oldZoom) / oldZoom;
+      mapOffsetY -= (centerY - mapOffsetY) * (zoomLevel - oldZoom) / oldZoom;
       updateMapTransform();
     });
 
-    function load() {
-      onValue(ref(db, 'umbrellas'), snapshot => {
-        const data = snapshot.val() || {};
-        umbrellas = [];
-        map.innerHTML = '';
-        for (const id in data) {
-          umbrellas.push(data[id]);
-          createUmbrella(data[id]);
-        }
-      });
-    }
+    // Pan con mouse/touch
+    let isPanning = false;
+    let startX, startY, startOffsetX, startOffsetY;
 
-    function saveUmbrella(data) {
-      set(ref(db, `umbrellas/${data.id}`), data);
-    }
+    map.addEventListener('touchstart', e => {
+      if (e.touches.length !== 1) return;
+      isPanning = true;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      startOffsetX = mapOffsetX;
+      startOffsetY = mapOffsetY;
+    }, { passive: false });
 
-    function deleteUmbrella(id) {
-      remove(ref(db, `umbrellas/${id}`));
+    map.addEventListener('touchmove', e => {
+      if (!isPanning || e.touches.length !== 1) return;
+      e.preventDefault();
+      const dx = e.touches[0].clientX - startX;
+      const dy = e.touches[0].clientY - startY;
+      mapOffsetX = startOffsetX + dx;
+      mapOffsetY = startOffsetY + dy;
+      updateMapTransform();
+    }, { passive: false });
+
+    map.addEventListener('touchend', () => { isPanning = false; });
+
+    map.addEventListener('mousedown', e => {
+      isPanning = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      startOffsetX = mapOffsetX;
+      startOffsetY = mapOffsetY;
+      document.addEventListener('mousemove', panMouse);
+      document.addEventListener('mouseup', () => {
+        isPanning = false;
+        document.removeEventListener('mousemove', panMouse);
+      }, { once: true });
+    });
+
+    function panMouse(e) {
+      if (!isPanning) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      mapOffsetX = startOffsetX + dx;
+      mapOffsetY = startOffsetY + dy;
+      updateMapTransform();
     }
 
     function createUmbrella(data) {
       const el = document.createElement('div');
       el.className = 'umbrella';
+      el.style.left = data.x + 'px';
+      el.style.top = data.y + 'px';
       el.dataset.id = data.id;
       el.dataset.lettini = data.lettini;
       el.dataset.open = data.open;
       el.dataset.mtime = data.mtime;
-      el.style.left = data.x + 'px';
-      el.style.top = data.y + 'px';
       map.appendChild(el);
       render(el);
     }
@@ -253,11 +294,21 @@
       el.classList.toggle('open', open);
       el.classList.toggle('closed', !open);
       el.innerHTML = '';
+
       const deleteBtn = document.createElement('div');
-      deleteBtn.className = 'delete-btn'; deleteBtn.title = 'Elimina'; deleteBtn.textContent = '🗑️';
+      deleteBtn.className = 'delete-btn';
+      deleteBtn.title = 'Elimina';
+      deleteBtn.textContent = '🗑️';
+
       const dateLabel = document.createElement('div');
       dateLabel.className = 'date-label';
-      dateLabel.textContent = date.toLocaleString('it-IT', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+      dateLabel.textContent = date.toLocaleString('it-IT', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
       el.appendChild(deleteBtn);
       el.appendChild(dateLabel);
       el.appendChild(document.createTextNode(lettini));
@@ -265,59 +316,49 @@
     }
 
     function addListeners(el) {
-      const deleteBtn = el.querySelector('.delete-btn');
-      deleteBtn.addEventListener('click', e => {
-        e.stopPropagation();
-        deleteUmbrella(el.dataset.id);
-      });
-
-      el.addEventListener('dblclick', () => openEditModal(el));
       el.addEventListener('mousedown', e => {
-        if (e.target.closest('.delete-btn')) return;
-        const startX = e.clientX, startY = e.clientY;
-        const origX = parseInt(el.style.left), origY = parseInt(el.style.top);
-        const handleMouseMove = ev => {
-          const dx = (ev.clientX - startX) / currentScale;
-          const dy = (ev.clientY - startY) / currentScale;
+        if (e.target.classList.contains('delete-btn')) return;
+        e.preventDefault();
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const origX = parseInt(el.style.left);
+        const origY = parseInt(el.style.top);
+
+        const move = ev => {
+          const dx = ev.clientX - startX;
+          const dy = ev.clientY - startY;
           el.style.left = origX + dx + 'px';
           el.style.top = origY + dy + 'px';
-          isDragging = true;
         };
-        const handleMouseUp = () => {
-          document.removeEventListener('mousemove', handleMouseMove);
-          document.removeEventListener('mouseup', handleMouseUp);
-          if (isDragging) {
-            el.dataset.mtime = Date.now();
-            updateData(el);
-            render(el);
-            const idx = umbrellas.findIndex(u => u.id == el.dataset.id);
-            if (idx !== -1) saveUmbrella(umbrellas[idx]);
-            isDragging = false;
+
+        const up = () => {
+          document.removeEventListener('mousemove', move);
+          document.removeEventListener('mouseup', up);
+          const idx = umbrellas.findIndex(u => u.id == el.dataset.id);
+          if (idx !== -1) {
+            umbrellas[idx].x = parseInt(el.style.left);
+            umbrellas[idx].y = parseInt(el.style.top);
+            umbrellas[idx].mtime = Date.now();
+            set(ref(db, `umbrellas/${el.dataset.id}`), umbrellas[idx]);
           }
         };
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
+
+        document.addEventListener('mousemove', move);
+        document.addEventListener('mouseup', up);
       });
-    }
 
-    function openEditModal(el) {
-      if (!el) return;
-      currentEl = el;
-      lettiniInput.value = el.dataset.lettini;
-      openCheckbox.checked = el.dataset.open === 'true';
-      modalBackdrop.style.display = 'flex';
-      setTimeout(() => lettiniInput.focus(), 100);
-    }
+      el.querySelector('.delete-btn').addEventListener('click', e => {
+        e.stopPropagation();
+        remove(ref(db, `umbrellas/${el.dataset.id}`));
+        el.remove();
+      });
 
-    function updateData(el) {
-      const idx = umbrellas.findIndex(u => u.id == el.dataset.id);
-      if (idx !== -1) {
-        umbrellas[idx].x = parseInt(el.style.left);
-        umbrellas[idx].y = parseInt(el.style.top);
-        umbrellas[idx].mtime = Date.now();
-        umbrellas[idx].lettini = el.dataset.lettini;
-        umbrellas[idx].open = el.dataset.open === 'true';
-      }
+      el.addEventListener('click', e => {
+        currentEl = el;
+        lettiniInput.value = el.dataset.lettini;
+        openCheckbox.checked = el.dataset.open === 'true';
+        modalBackdrop.style.display = 'flex';
+      });
     }
 
     cancelBtn.addEventListener('click', () => {
@@ -330,40 +371,48 @@
       currentEl.dataset.lettini = lettiniInput.value || '2';
       currentEl.dataset.open = openCheckbox.checked;
       currentEl.dataset.mtime = Date.now();
-      updateData(currentEl);
       render(currentEl);
+
       const idx = umbrellas.findIndex(u => u.id == currentEl.dataset.id);
-      if (idx !== -1) saveUmbrella(umbrellas[idx]);
+      if (idx !== -1) {
+        umbrellas[idx].lettini = currentEl.dataset.lettini;
+        umbrellas[idx].open = openCheckbox.checked;
+        umbrellas[idx].mtime = Date.now();
+        set(ref(db, `umbrellas/${currentEl.dataset.id}`), umbrellas[idx]);
+      }
+
       modalBackdrop.style.display = 'none';
       currentEl = null;
     });
 
-    modalBackdrop.addEventListener('click', e => {
-      if (e.target === modalBackdrop) modalBackdrop.style.display = 'none';
-    });
+    function load() {
+      onValue(ref(db, 'umbrellas'), snapshot => {
+        map.innerHTML = '';
+        umbrellas = [];
+        const data = snapshot.val() || {};
+        for (const id in data) {
+          umbrellas.push(data[id]);
+          createUmbrella(data[id]);
+        }
+      });
+    }
 
-    function createNewUmbrella(clientX, clientY) {
-      const containerRect = mapContainer.getBoundingClientRect();
-      const adjustedX = (clientX - containerRect.left - currentTranslateX * currentScale) / currentScale;
-      const adjustedY = (clientY - containerRect.top - currentTranslateY * currentScale) / currentScale;
-      const id = crypto.randomUUID();
-      const data = {
+    map.addEventListener('click', e => {
+      if (e.target !== map) return;
+      const rect = map.getBoundingClientRect();
+      const x = (e.clientX - rect.left - mapOffsetX) / zoomLevel;
+      const y = (e.clientY - rect.top - mapOffsetY) / zoomLevel;
+      const id = Date.now() + Math.random();
+      const newUmbrella = {
         id,
         lettini: '2',
         open: false,
-        x: Math.max(0, Math.min(adjustedX - 70, 2000 - 140)),
-        y: Math.max(0, Math.min(adjustedY - 70, 2000 - 140)),
+        x,
+        y,
         mtime: Date.now()
       };
-      umbrellas.push(data);
-      createUmbrella(data);
-      saveUmbrella(data);
-    }
-
-    mapContainer.addEventListener('dblclick', e => {
-      if (!e.target.closest('.umbrella')) {
-        createNewUmbrella(e.clientX, e.clientY);
-      }
+      umbrellas.push(newUmbrella);
+      set(ref(db, `umbrellas/${id}`), newUmbrella);
     });
 
     load();
