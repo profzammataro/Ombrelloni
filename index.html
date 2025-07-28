@@ -12,13 +12,26 @@
       -webkit-user-select: none;
       -webkit-touch-callout: none;
       user-select: none;
+      overflow: hidden;
     }
 
-    #map {
+    #map-container {
       width: 100vw;
       height: 100vh;
       position: relative;
+      overflow: hidden;
       cursor: crosshair;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #map {
+      width: 200vw;
+      height: 200vh;
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform-origin: 0 0;
+      transition: transform 0.1s ease-out;
       -webkit-tap-highlight-color: transparent;
     }
 
@@ -80,6 +93,36 @@
       pointer-events: none;
     }
 
+    #zoom-controls {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .zoom-btn {
+      width: 50px;
+      height: 50px;
+      background: rgba(255,255,255,0.9);
+      border: 2px solid #333;
+      border-radius: 50%;
+      font-size: 24px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+
+    .zoom-btn:hover {
+      background: rgba(255,255,255,1);
+    }
+
     #modal-backdrop {
       display: none;
       position: fixed;
@@ -90,7 +133,7 @@
       background: rgba(0,0,0,0.5);
       justify-content: center;
       align-items: center;
-      z-index: 10;
+      z-index: 1000;
       -webkit-tap-highlight-color: transparent;
     }
 
@@ -162,7 +205,14 @@
   </style>
 </head>
 <body>
-  <div id="map"></div>
+  <div id="map-container">
+    <div id="map"></div>
+  </div>
+
+  <div id="zoom-controls">
+    <button class="zoom-btn" id="zoom-in">+</button>
+    <button class="zoom-btn" id="zoom-out">−</button>
+  </div>
 
   <!-- Modal -->
   <div id="modal-backdrop">
@@ -198,18 +248,27 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
+    const mapContainer = document.getElementById('map-container');
     const map = document.getElementById('map');
     const modalBackdrop = document.getElementById('modal-backdrop');
     const lettiniInput = document.getElementById('lettini-input');
     const openCheckbox = document.getElementById('open-checkbox');
     const cancelBtn = document.getElementById('cancel-btn');
     const saveBtn = document.getElementById('save-btn');
+    const zoomInBtn = document.getElementById('zoom-in');
+    const zoomOutBtn = document.getElementById('zoom-out');
 
     let currentEl = null;
     let umbrellas = [];
     let isDragging = false;
-    let dragStartTime = 0;
-    let tapTimeout = null;
+    let isMapPanning = false;
+    
+    // Zoom e pan variables
+    let currentScale = 1;
+    let currentTranslateX = 0;
+    let currentTranslateY = 0;
+    let minScale = 0.5;
+    let maxScale = 3;
 
     function load() {
       onValue(ref(db, 'umbrellas'), snapshot => {
@@ -275,23 +334,24 @@
     function addListeners(el) {
       const deleteBtn = el.querySelector('.delete-btn');
       
-      // Gestione del pulsante elimina
+      // Gestione del pulsante elimina - FIX: Evita la propagazione e usa l'ID corretto
+      const handleDelete = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        const umbrellaId = el.dataset.id;
+        console.log('Deleting umbrella with ID:', umbrellaId);
+        deleteUmbrella(umbrellaId);
+      };
+
       deleteBtn.addEventListener('touchstart', e => {
         e.preventDefault();
         e.stopPropagation();
+        e.stopImmediatePropagation();
       });
 
-      deleteBtn.addEventListener('touchend', e => {
-        e.preventDefault();
-        e.stopPropagation();
-        deleteUmbrella(el.dataset.id);
-      });
-
-      deleteBtn.addEventListener('click', e => {
-        e.preventDefault();
-        e.stopPropagation();
-        deleteUmbrella(el.dataset.id);
-      });
+      deleteBtn.addEventListener('touchend', handleDelete);
+      deleteBtn.addEventListener('click', handleDelete);
 
       // Variabili per la gestione del touch
       let touchStartX = 0;
@@ -306,6 +366,7 @@
         if (e.target.closest('.delete-btn')) return;
         
         e.preventDefault();
+        e.stopPropagation();
         const touch = e.touches[0];
         touchStartX = touch.clientX;
         touchStartY = touch.clientY;
@@ -320,6 +381,7 @@
         if (e.target.closest('.delete-btn')) return;
         
         e.preventDefault();
+        e.stopPropagation();
         const touch = e.touches[0];
         const deltaX = touch.clientX - touchStartX;
         const deltaY = touch.clientY - touchStartY;
@@ -328,8 +390,8 @@
         if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
           hasMoved = true;
           isDragging = true;
-          el.style.left = (elementStartX + deltaX) + 'px';
-          el.style.top = (elementStartY + deltaY) + 'px';
+          el.style.left = (elementStartX + deltaX / currentScale) + 'px';
+          el.style.top = (elementStartY + deltaY / currentScale) + 'px';
         }
       });
 
@@ -337,6 +399,7 @@
         if (e.target.closest('.delete-btn')) return;
         
         e.preventDefault();
+        e.stopPropagation();
         const touchDuration = Date.now() - touchStartTime;
         
         if (hasMoved && isDragging) {
@@ -360,6 +423,7 @@
         if (e.target.closest('.delete-btn')) return;
         
         e.preventDefault();
+        e.stopPropagation();
         const startX = e.clientX;
         const startY = e.clientY;
         const origX = parseInt(el.style.left);
@@ -369,8 +433,8 @@
         const handleMouseMove = ev => {
           mouseMoved = true;
           isDragging = true;
-          const dx = ev.clientX - startX;
-          const dy = ev.clientY - startY;
+          const dx = (ev.clientX - startX) / currentScale;
+          const dy = (ev.clientY - startY) / currentScale;
           el.style.left = origX + dx + 'px';
           el.style.top = origY + dy + 'px';
         };
@@ -399,14 +463,13 @@
     }
 
     function openEditModal(el) {
-      if (isDragging) return; // Non aprire il modal se si sta trascinando
+      if (isDragging || isMapPanning) return;
       
       currentEl = el;
       lettiniInput.value = el.dataset.lettini;
       openCheckbox.checked = el.dataset.open === 'true';
       modalBackdrop.style.display = 'flex';
       
-      // Focus sull'input per migliorare l'usabilità mobile
       setTimeout(() => {
         lettiniInput.focus();
       }, 100);
@@ -424,15 +487,40 @@
       }
     }
 
+    // Zoom functions
+    function updateMapTransform() {
+      map.style.transform = `scale(${currentScale}) translate(${currentTranslateX}px, ${currentTranslateY}px)`;
+    }
+
+    function zoomIn() {
+      if (currentScale < maxScale) {
+        currentScale = Math.min(currentScale * 1.2, maxScale);
+        updateMapTransform();
+      }
+    }
+
+    function zoomOut() {
+      if (currentScale > minScale) {
+        currentScale = Math.max(currentScale / 1.2, minScale);
+        updateMapTransform();
+      }
+    }
+
     // Gestione creazione ombrelloni
     function createNewUmbrella(x, y) {
-      const id = Date.now() + Math.random(); // Aggiunto random per evitare conflitti
+      // Converti le coordinate considerando zoom e pan
+      const mapRect = map.getBoundingClientRect();
+      const containerRect = mapContainer.getBoundingClientRect();
+      const adjustedX = (x - containerRect.left - currentTranslateX * currentScale) / currentScale;
+      const adjustedY = (y - containerRect.top - currentTranslateY * currentScale) / currentScale;
+      
+      const id = Date.now() + Math.random();
       const data = {
         id,
         lettini: '2',
         open: false,
-        x: Math.max(0, Math.min(x - 70, window.innerWidth - 140)),
-        y: Math.max(0, Math.min(y - 70, window.innerHeight - 140)),
+        x: Math.max(0, Math.min(adjustedX - 70, 2000 - 140)),
+        y: Math.max(0, Math.min(adjustedY - 70, 2000 - 140)),
         mtime: Date.now()
       };
 
@@ -441,42 +529,110 @@
       saveUmbrella(data);
     }
 
-    // Eventi per la creazione di ombrelloni
-    map.addEventListener('touchstart', e => {
-      if (e.target !== map) return;
-      e.preventDefault();
-      
-      // Memorizza la posizione del touch
-      map.touchStartX = e.touches[0].clientX;
-      map.touchStartY = e.touches[0].clientY;
-      map.touchStartTime = Date.now();
-    });
+    // Pan functionality
+    let panStartX = 0;
+    let panStartY = 0;
+    let panStartTranslateX = 0;
+    let panStartTranslateY = 0;
+    let isPanning = false;
 
-    map.addEventListener('touchend', e => {
-      if (e.target !== map) return;
-      e.preventDefault();
-      
-      const touchDuration = Date.now() - map.touchStartTime;
-      const touch = e.changedTouches[0];
-      const deltaX = Math.abs(touch.clientX - map.touchStartX);
-      const deltaY = Math.abs(touch.clientY - map.touchStartY);
-      
-      // Solo se è un tap veloce e senza movimento
-      if (touchDuration < 300 && deltaX < 10 && deltaY < 10) {
-        const rect = map.getBoundingClientRect();
-        const x = touch.clientX - rect.left;
-        const y = touch.clientY - rect.top;
-        createNewUmbrella(x, y);
+    // Eventi per il panning della mappa
+    mapContainer.addEventListener('touchstart', e => {
+      if (e.touches.length === 1 && e.target === mapContainer) {
+        e.preventDefault();
+        const touch = e.touches[0];
+        panStartX = touch.clientX;
+        panStartY = touch.clientY;
+        panStartTranslateX = currentTranslateX;
+        panStartTranslateY = currentTranslateY;
+        isPanning = false;
+        isMapPanning = false;
       }
     });
 
-    map.addEventListener('click', e => {
-      if (e.target !== map) return;
-      
-      const rect = map.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      createNewUmbrella(x, y);
+    mapContainer.addEventListener('touchmove', e => {
+      if (e.touches.length === 1 && e.target === mapContainer) {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const deltaX = (touch.clientX - panStartX) / currentScale;
+        const deltaY = (touch.clientY - panStartY) / currentScale;
+        
+        if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+          isPanning = true;
+          isMapPanning = true;
+          currentTranslateX = panStartTranslateX + deltaX;
+          currentTranslateY = panStartTranslateY + deltaY;
+          updateMapTransform();
+        }
+      }
+    });
+
+    mapContainer.addEventListener('touchend', e => {
+      if (e.changedTouches.length === 1 && e.target === mapContainer) {
+        e.preventDefault();
+        
+        if (!isPanning && !isMapPanning) {
+          // Era un tap per creare ombrellone
+          const touch = e.changedTouches[0];
+          createNewUmbrella(touch.clientX, touch.clientY);
+        }
+        
+        setTimeout(() => {
+          isPanning = false;
+          isMapPanning = false;
+        }, 100);
+      }
+    });
+
+    // Mouse events per desktop
+    mapContainer.addEventListener('mousedown', e => {
+      if (e.target === mapContainer) {
+        panStartX = e.clientX;
+        panStartY = e.clientY;
+        panStartTranslateX = currentTranslateX;
+        panStartTranslateY = currentTranslateY;
+        isPanning = false;
+        
+        const handleMouseMove = (ev) => {
+          const deltaX = (ev.clientX - panStartX) / currentScale;
+          const deltaY = (ev.clientY - panStartY) / currentScale;
+          isPanning = true;
+          isMapPanning = true;
+          currentTranslateX = panStartTranslateX + deltaX;
+          currentTranslateY = panStartTranslateY + deltaY;
+          updateMapTransform();
+        };
+        
+        const handleMouseUp = (ev) => {
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
+          
+          if (!isPanning) {
+            createNewUmbrella(ev.clientX, ev.clientY);
+          }
+          
+          setTimeout(() => {
+            isPanning = false;
+            isMapPanning = false;
+          }, 100);
+        };
+        
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+      }
+    });
+
+    // Zoom controls
+    zoomInBtn.addEventListener('click', zoomIn);
+    zoomInBtn.addEventListener('touchend', e => {
+      e.preventDefault();
+      zoomIn();
+    });
+
+    zoomOutBtn.addEventListener('click', zoomOut);
+    zoomOutBtn.addEventListener('touchend', e => {
+      e.preventDefault();
+      zoomOut();
     });
 
     // Gestione pulsanti modal
@@ -538,21 +694,12 @@
       }
     });
 
-    // Previeni il comportamento di default per alcuni eventi iOS
+    // Previeni comportamenti indesiderati
     document.addEventListener('touchstart', e => {
       if (e.touches.length > 1) {
-        e.preventDefault(); // Previeni zoom con due dita
+        e.preventDefault();
       }
     }, { passive: false });
 
     document.addEventListener('touchmove', e => {
-      if (e.touches.length > 1) {
-        e.preventDefault(); // Previeni zoom con due dita
-      }
-    }, { passive: false });
-
-    // Inizializza l'app
-    load();
-  </script>
-</body>
-</html>
+      if (e.to
