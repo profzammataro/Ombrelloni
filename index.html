@@ -195,8 +195,8 @@
 <body>
   <div id="instructions">
     <strong>Istruzioni:</strong><br>
-    • Doppio click: crea ombrellone<br>
-    • Click singolo: modifica ombrellone<br>
+    • Doppio click/tap: crea ombrellone<br>
+    • Click/tap singolo: modifica ombrellone<br>
     • Trascina per spostare<br>
     • 🗑️ per eliminare
   </div>
@@ -277,15 +277,38 @@
       updateMapTransform();
     });
 
-    // Variabili per il panning e doppio click
+    // Variabili globali per la gestione degli eventi
     let isPanning = false;
     let startX, startY, startOffsetX, startOffsetY;
-    let lastClickTime = 0;
-    let clickCount = 0;
+    let lastTapTime = 0;
+    let tapCount = 0;
+    let tapTimeout = null;
 
-    // Mouse events per desktop
+    // Funzione per creare un nuovo ombrellone
+    function createNewUmbrella(clientX, clientY) {
+      const rect = mapWrapper.getBoundingClientRect();
+      const x = (clientX - rect.left - mapOffsetX) / zoomLevel;
+      const y = (clientY - rect.top - mapOffsetY) / zoomLevel;
+      
+      console.log('Creazione ombrellone a:', x, y);
+      
+      const id = Date.now() + Math.random();
+      const newUmbrella = {
+        id,
+        lettini: '2',
+        open: false,
+        x: Math.round(x),
+        y: Math.round(y),
+        mtime: Date.now()
+      };
+      
+      umbrellas.push(newUmbrella);
+      set(ref(db, `umbrellas/${id}`), newUmbrella);
+      createUmbrella(newUmbrella);
+    }
+
+    // Gestione mouse events per desktop
     mapWrapper.addEventListener('mousedown', e => {
-      // Se stiamo cliccando su un ombrellone o sui suoi elementi, non fare panning
       if (e.target.closest('.umbrella')) return;
       
       e.preventDefault();
@@ -314,101 +337,64 @@
       document.addEventListener('mouseup', mouseUpHandler);
     });
 
-    // Gestione doppio click separata
-    mapWrapper.addEventListener('click', e => {
-      // Ignora i click sugli ombrelloni
+    // Gestione doppio click per desktop
+    mapWrapper.addEventListener('dblclick', e => {
       if (e.target.closest('.umbrella')) return;
-      
       e.preventDefault();
-      e.stopPropagation();
-      
-      const currentTime = Date.now();
-      
-      if (currentTime - lastClickTime < 400) {
-        // Doppio click rilevato
-        clickCount = 0;
-        
-        // Calcola le coordinate corrette tenendo conto di zoom e offset
-        const rect = mapWrapper.getBoundingClientRect();
-        const x = (e.clientX - rect.left - mapOffsetX) / zoomLevel;
-        const y = (e.clientY - rect.top - mapOffsetY) / zoomLevel;
-        
-        console.log('Creazione ombrellone a:', x, y); // Debug
-        
-        const id = Date.now() + Math.random();
-        const newUmbrella = {
-          id,
-          lettini: '2',
-          open: false,
-          x: Math.round(x),
-          y: Math.round(y),
-          mtime: Date.now()
-        };
-        
-        umbrellas.push(newUmbrella);
-        set(ref(db, `umbrellas/${id}`), newUmbrella);
-        createUmbrella(newUmbrella);
-      } else {
-        clickCount = 1;
-      }
-      
-      lastClickTime = currentTime;
+      createNewUmbrella(e.clientX, e.clientY);
     });
 
-    // Touch events per mobile
+    // Gestione touch events per mobile con doppio tap
     mapWrapper.addEventListener('touchstart', e => {
-      // Se stiamo toccando un ombrellone, non fare panning
       if (e.target.closest('.umbrella')) return;
-      
       if (e.touches.length !== 1) return;
-      e.preventDefault();
-      isPanning = true;
-      startX = e.touches[0].clientX;
-      startY = e.touches[0].clientY;
-      startOffsetX = mapOffsetX;
-      startOffsetY = mapOffsetY;
+      
+      const touch = e.touches[0];
+      const currentTime = Date.now();
+      
+      // Gestione doppio tap
+      if (currentTime - lastTapTime < 500) {
+        // Doppio tap rilevato
+        e.preventDefault();
+        clearTimeout(tapTimeout);
+        createNewUmbrella(touch.clientX, touch.clientY);
+        tapCount = 0;
+        lastTapTime = 0;
+        return;
+      }
+      
+      // Primo tap - inizia il panning solo se non è un doppio tap
+      lastTapTime = currentTime;
+      tapCount = 1;
+      
+      // Timeout per distinguere tra singolo tap e inizio di doppio tap
+      tapTimeout = setTimeout(() => {
+        // È un singolo tap, inizia il panning
+        if (tapCount === 1) {
+          isPanning = true;
+          startX = touch.clientX;
+          startY = touch.clientY;
+          startOffsetX = mapOffsetX;
+          startOffsetY = mapOffsetY;
+        }
+      }, 200);
     }, { passive: false });
 
     mapWrapper.addEventListener('touchmove', e => {
+      if (e.target.closest('.umbrella')) return;
       if (!isPanning || e.touches.length !== 1) return;
+      
       e.preventDefault();
-      const dx = e.touches[0].clientX - startX;
-      const dy = e.touches[0].clientY - startY;
+      const touch = e.touches[0];
+      const dx = touch.clientX - startX;
+      const dy = touch.clientY - startY;
       mapOffsetX = startOffsetX + dx;
       mapOffsetY = startOffsetY + dy;
       updateMapTransform();
     }, { passive: false });
 
-    mapWrapper.addEventListener('touchend', e => { 
-      if (!isPanning) {
-        // Gestione tap per mobile
-        const currentTime = Date.now();
-        
-        if (currentTime - lastClickTime < 400) {
-          const rect = mapWrapper.getBoundingClientRect();
-          const touch = e.changedTouches[0];
-          const x = (touch.clientX - rect.left - mapOffsetX) / zoomLevel;
-          const y = (touch.clientY - rect.top - mapOffsetY) / zoomLevel;
-          
-          const id = Date.now() + Math.random();
-          const newUmbrella = {
-            id,
-            lettini: '2',
-            open: false,
-            x: Math.round(x),
-            y: Math.round(y),
-            mtime: Date.now()
-          };
-          
-          umbrellas.push(newUmbrella);
-          set(ref(db, `umbrellas/${id}`), newUmbrella);
-          createUmbrella(newUmbrella);
-        }
-        
-        lastClickTime = currentTime;
-      }
-      
-      isPanning = false; 
+    mapWrapper.addEventListener('touchend', e => {
+      isPanning = false;
     });
 
     function createUmbrella(data) {
@@ -507,16 +493,29 @@
         document.addEventListener('mouseup', up);
       });
 
-      // Touch events per mobile
+      // Touch events per mobile con gestione migliorata
+      let umbrellaLastTapTime = 0;
+      
       el.addEventListener('touchstart', e => {
         if (e.target.classList.contains('delete-btn')) return;
         e.preventDefault();
         e.stopPropagation();
         
+        const touch = e.touches[0];
+        const currentTime = Date.now();
+        
+        // Gestione doppio tap sull'ombrellone per modifica
+        if (currentTime - umbrellaLastTapTime < 500) {
+          // Doppio tap - apri modal di modifica
+          openEditModal(el);
+          umbrellaLastTapTime = 0;
+          return;
+        }
+        
+        umbrellaLastTapTime = currentTime;
         isDragging = false;
         dragStartTime = Date.now();
         
-        const touch = e.touches[0];
         const startX = touch.clientX;
         const startY = touch.clientY;
         const origX = parseInt(el.style.left);
@@ -551,11 +550,6 @@
               umbrellas[idx].mtime = Date.now();
               set(ref(db, `umbrellas/${el.dataset.id}`), umbrellas[idx]);
             }
-          } else {
-            const touchDuration = Date.now() - dragStartTime;
-            if (touchDuration < 300) {
-              openEditModal(el);
-            }
           }
         };
 
@@ -563,8 +557,34 @@
         document.addEventListener('touchend', touchEnd);
       }, { passive: false });
 
+      // Versione alternativa per singolo tap (se necessario)
+      el.addEventListener('click', e => {
+        if (e.target.classList.contains('delete-btn')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Solo per desktop - il touch è gestito sopra
+        if (e.type === 'click' && !('ontouchstart' in window)) {
+          openEditModal(el);
+        }
+      });
+
       // Gestione del pulsante elimina
       el.querySelector('.delete-btn').addEventListener('click', e => {
+        e.stopPropagation();
+        if (confirm('Vuoi eliminare questo ombrellone?')) {
+          remove(ref(db, `umbrellas/${el.dataset.id}`));
+          el.remove();
+          const idx = umbrellas.findIndex(u => u.id == el.dataset.id);
+          if (idx !== -1) {
+            umbrellas.splice(idx, 1);
+          }
+        }
+      });
+
+      // Gestione touch del pulsante elimina
+      el.querySelector('.delete-btn').addEventListener('touchend', e => {
+        e.preventDefault();
         e.stopPropagation();
         if (confirm('Vuoi eliminare questo ombrellone?')) {
           remove(ref(db, `umbrellas/${el.dataset.id}`));
