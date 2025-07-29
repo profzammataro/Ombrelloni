@@ -241,6 +241,7 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
+    const mapWrapper = document.getElementById('map-wrapper');
     const map = document.getElementById('map');
     const zoomSlider = document.getElementById('zoom-slider');
     const zoomValue = document.getElementById('zoom-value');
@@ -276,40 +277,13 @@
       updateMapTransform();
     });
 
-    // Variabili per il panning
+    // Variabili per il panning e doppio click
     let isPanning = false;
     let startX, startY, startOffsetX, startOffsetY;
+    let lastClickTime = 0;
+    let clickCount = 0;
 
-    // Touch events per mobile - gestiti su map-wrapper
-    mapWrapper.addEventListener('touchstart', e => {
-      // Se stiamo toccando un ombrellone, non fare panning
-      if (e.target.closest('.umbrella')) return;
-      
-      if (e.touches.length !== 1) return;
-      e.preventDefault();
-      isPanning = true;
-      startX = e.touches[0].clientX;
-      startY = e.touches[0].clientY;
-      startOffsetX = mapOffsetX;
-      startOffsetY = mapOffsetY;
-    }, { passive: false });
-
-    mapWrapper.addEventListener('touchmove', e => {
-      if (!isPanning || e.touches.length !== 1) return;
-      e.preventDefault();
-      const dx = e.touches[0].clientX - startX;
-      const dy = e.touches[0].clientY - startY;
-      mapOffsetX = startOffsetX + dx;
-      mapOffsetY = startOffsetY + dy;
-      updateMapTransform();
-    }, { passive: false });
-
-    mapWrapper.addEventListener('touchend', () => { 
-      isPanning = false; 
-    });
-
-    // Mouse events per desktop - gestiti su map-wrapper per coprire tutta l'area
-    const mapWrapper = document.getElementById('map-wrapper');
+    // Mouse events per desktop
     mapWrapper.addEventListener('mousedown', e => {
       // Se stiamo cliccando su un ombrellone o sui suoi elementi, non fare panning
       if (e.target.closest('.umbrella')) return;
@@ -338,6 +312,103 @@
 
       document.addEventListener('mousemove', mouseMoveHandler);
       document.addEventListener('mouseup', mouseUpHandler);
+    });
+
+    // Gestione doppio click separata
+    mapWrapper.addEventListener('click', e => {
+      // Ignora i click sugli ombrelloni
+      if (e.target.closest('.umbrella')) return;
+      
+      e.preventDefault();
+      e.stopPropagation();
+      
+      const currentTime = Date.now();
+      
+      if (currentTime - lastClickTime < 400) {
+        // Doppio click rilevato
+        clickCount = 0;
+        
+        // Calcola le coordinate corrette tenendo conto di zoom e offset
+        const rect = mapWrapper.getBoundingClientRect();
+        const x = (e.clientX - rect.left - mapOffsetX) / zoomLevel;
+        const y = (e.clientY - rect.top - mapOffsetY) / zoomLevel;
+        
+        console.log('Creazione ombrellone a:', x, y); // Debug
+        
+        const id = Date.now() + Math.random();
+        const newUmbrella = {
+          id,
+          lettini: '2',
+          open: false,
+          x: Math.round(x),
+          y: Math.round(y),
+          mtime: Date.now()
+        };
+        
+        umbrellas.push(newUmbrella);
+        set(ref(db, `umbrellas/${id}`), newUmbrella);
+        createUmbrella(newUmbrella);
+      } else {
+        clickCount = 1;
+      }
+      
+      lastClickTime = currentTime;
+    });
+
+    // Touch events per mobile
+    mapWrapper.addEventListener('touchstart', e => {
+      // Se stiamo toccando un ombrellone, non fare panning
+      if (e.target.closest('.umbrella')) return;
+      
+      if (e.touches.length !== 1) return;
+      e.preventDefault();
+      isPanning = true;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      startOffsetX = mapOffsetX;
+      startOffsetY = mapOffsetY;
+    }, { passive: false });
+
+    mapWrapper.addEventListener('touchmove', e => {
+      if (!isPanning || e.touches.length !== 1) return;
+      e.preventDefault();
+      const dx = e.touches[0].clientX - startX;
+      const dy = e.touches[0].clientY - startY;
+      mapOffsetX = startOffsetX + dx;
+      mapOffsetY = startOffsetY + dy;
+      updateMapTransform();
+    }, { passive: false });
+
+    mapWrapper.addEventListener('touchend', e => { 
+      if (!isPanning) {
+        // Gestione tap per mobile
+        const currentTime = Date.now();
+        
+        if (currentTime - lastClickTime < 400) {
+          const rect = mapWrapper.getBoundingClientRect();
+          const touch = e.changedTouches[0];
+          const x = (touch.clientX - rect.left - mapOffsetX) / zoomLevel;
+          const y = (touch.clientY - rect.top - mapOffsetY) / zoomLevel;
+          
+          const id = Date.now() + Math.random();
+          const newUmbrella = {
+            id,
+            lettini: '2',
+            open: false,
+            x: Math.round(x),
+            y: Math.round(y),
+            mtime: Date.now()
+          };
+          
+          umbrellas.push(newUmbrella);
+          set(ref(db, `umbrellas/${id}`), newUmbrella);
+          createUmbrella(newUmbrella);
+        }
+        
+        lastClickTime = currentTime;
+      }
+      
+      isPanning = false; 
     });
 
     function createUmbrella(data) {
@@ -389,7 +460,7 @@
       el.addEventListener('mousedown', e => {
         if (e.target.classList.contains('delete-btn')) return;
         e.preventDefault();
-        e.stopPropagation(); // Impedisce il panning della mappa
+        e.stopPropagation();
         
         isDragging = false;
         dragStartTime = Date.now();
@@ -400,7 +471,6 @@
         const origY = parseInt(el.style.top);
 
         const move = ev => {
-          // Se ci spostiamo di più di 5px, consideriamo che stiamo trascinando
           const dx = ev.clientX - startX;
           const dy = ev.clientY - startY;
           if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
@@ -418,7 +488,6 @@
           document.removeEventListener('mouseup', up);
           
           if (isDragging) {
-            // Salva la nuova posizione
             const idx = umbrellas.findIndex(u => u.id == el.dataset.id);
             if (idx !== -1) {
               umbrellas[idx].x = parseInt(el.style.left);
@@ -427,7 +496,6 @@
               set(ref(db, `umbrellas/${el.dataset.id}`), umbrellas[idx]);
             }
           } else {
-            // Se non abbiamo trascinato e il click è stato veloce, apri il modal
             const clickDuration = Date.now() - dragStartTime;
             if (clickDuration < 300) {
               openEditModal(el);
@@ -443,7 +511,7 @@
       el.addEventListener('touchstart', e => {
         if (e.target.classList.contains('delete-btn')) return;
         e.preventDefault();
-        e.stopPropagation(); // Impedisce il panning della mappa
+        e.stopPropagation();
         
         isDragging = false;
         dragStartTime = Date.now();
@@ -476,7 +544,6 @@
           document.removeEventListener('touchend', touchEnd);
           
           if (isDragging) {
-            // Salva la nuova posizione
             const idx = umbrellas.findIndex(u => u.id == el.dataset.id);
             if (idx !== -1) {
               umbrellas[idx].x = parseInt(el.style.left);
@@ -485,7 +552,6 @@
               set(ref(db, `umbrellas/${el.dataset.id}`), umbrellas[idx]);
             }
           } else {
-            // Se non abbiamo trascinato e il tocco è stato veloce, apri il modal
             const touchDuration = Date.now() - dragStartTime;
             if (touchDuration < 300) {
               openEditModal(el);
@@ -503,6 +569,10 @@
         if (confirm('Vuoi eliminare questo ombrellone?')) {
           remove(ref(db, `umbrellas/${el.dataset.id}`));
           el.remove();
+          const idx = umbrellas.findIndex(u => u.id == el.dataset.id);
+          if (idx !== -1) {
+            umbrellas.splice(idx, 1);
+          }
         }
       });
     }
@@ -558,35 +628,6 @@
         }
       });
     }
-
-    // Gestione doppio click per creare ombrelloni
-    let lastClickTime = 0;
-    map.addEventListener('click', e => {
-      if (e.target !== map) return;
-      
-      const currentTime = Date.now();
-      const timeDiff = currentTime - lastClickTime;
-      
-      if (timeDiff < 500) { // Doppio click entro 500ms
-        e.preventDefault();
-        const rect = map.getBoundingClientRect();
-        const x = (e.clientX - rect.left - mapOffsetX) / zoomLevel;
-        const y = (e.clientY - rect.top - mapOffsetY) / zoomLevel;
-        const id = Date.now() + Math.random();
-        const newUmbrella = {
-          id,
-          lettini: '2',
-          open: false,
-          x,
-          y,
-          mtime: Date.now()
-        };
-        umbrellas.push(newUmbrella);
-        set(ref(db, `umbrellas/${id}`), newUmbrella);
-      }
-      
-      lastClickTime = currentTime;
-    });
 
     // Inizializza
     updateMapTransform();
