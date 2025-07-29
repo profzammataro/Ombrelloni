@@ -280,8 +280,11 @@
     let isPanning = false;
     let startX, startY, startOffsetX, startOffsetY;
 
-    // Touch events per mobile
-    map.addEventListener('touchstart', e => {
+    // Touch events per mobile - gestiti su map-wrapper
+    mapWrapper.addEventListener('touchstart', e => {
+      // Se stiamo toccando un ombrellone, non fare panning
+      if (e.target.closest('.umbrella')) return;
+      
       if (e.touches.length !== 1) return;
       e.preventDefault();
       isPanning = true;
@@ -291,7 +294,7 @@
       startOffsetY = mapOffsetY;
     }, { passive: false });
 
-    map.addEventListener('touchmove', e => {
+    mapWrapper.addEventListener('touchmove', e => {
       if (!isPanning || e.touches.length !== 1) return;
       e.preventDefault();
       const dx = e.touches[0].clientX - startX;
@@ -301,13 +304,16 @@
       updateMapTransform();
     }, { passive: false });
 
-    map.addEventListener('touchend', () => { 
+    mapWrapper.addEventListener('touchend', () => { 
       isPanning = false; 
     });
 
-    // Mouse events per desktop
-    map.addEventListener('mousedown', e => {
-      if (e.target !== map) return; // Solo se clicchiamo direttamente sulla mappa
+    // Mouse events per desktop - gestiti su map-wrapper per coprire tutta l'area
+    const mapWrapper = document.getElementById('map-wrapper');
+    mapWrapper.addEventListener('mousedown', e => {
+      // Se stiamo cliccando su un ombrellone o sui suoi elementi, non fare panning
+      if (e.target.closest('.umbrella')) return;
+      
       e.preventDefault();
       isPanning = true;
       startX = e.clientX;
@@ -379,10 +385,11 @@
       let isDragging = false;
       let dragStartTime = 0;
 
+      // Mouse events per desktop
       el.addEventListener('mousedown', e => {
         if (e.target.classList.contains('delete-btn')) return;
         e.preventDefault();
-        e.stopPropagation();
+        e.stopPropagation(); // Impedisce il panning della mappa
         
         isDragging = false;
         dragStartTime = Date.now();
@@ -401,8 +408,8 @@
           }
           
           if (isDragging) {
-            el.style.left = origX + dx + 'px';
-            el.style.top = origY + dy + 'px';
+            el.style.left = (origX + dx / zoomLevel) + 'px';
+            el.style.top = (origY + dy / zoomLevel) + 'px';
           }
         };
 
@@ -431,6 +438,64 @@
         document.addEventListener('mousemove', move);
         document.addEventListener('mouseup', up);
       });
+
+      // Touch events per mobile
+      el.addEventListener('touchstart', e => {
+        if (e.target.classList.contains('delete-btn')) return;
+        e.preventDefault();
+        e.stopPropagation(); // Impedisce il panning della mappa
+        
+        isDragging = false;
+        dragStartTime = Date.now();
+        
+        const touch = e.touches[0];
+        const startX = touch.clientX;
+        const startY = touch.clientY;
+        const origX = parseInt(el.style.left);
+        const origY = parseInt(el.style.top);
+
+        const touchMove = ev => {
+          if (ev.touches.length !== 1) return;
+          const touch = ev.touches[0];
+          const dx = touch.clientX - startX;
+          const dy = touch.clientY - startY;
+          
+          if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+            isDragging = true;
+          }
+          
+          if (isDragging) {
+            ev.preventDefault();
+            el.style.left = (origX + dx / zoomLevel) + 'px';
+            el.style.top = (origY + dy / zoomLevel) + 'px';
+          }
+        };
+
+        const touchEnd = () => {
+          document.removeEventListener('touchmove', touchMove);
+          document.removeEventListener('touchend', touchEnd);
+          
+          if (isDragging) {
+            // Salva la nuova posizione
+            const idx = umbrellas.findIndex(u => u.id == el.dataset.id);
+            if (idx !== -1) {
+              umbrellas[idx].x = parseInt(el.style.left);
+              umbrellas[idx].y = parseInt(el.style.top);
+              umbrellas[idx].mtime = Date.now();
+              set(ref(db, `umbrellas/${el.dataset.id}`), umbrellas[idx]);
+            }
+          } else {
+            // Se non abbiamo trascinato e il tocco è stato veloce, apri il modal
+            const touchDuration = Date.now() - dragStartTime;
+            if (touchDuration < 300) {
+              openEditModal(el);
+            }
+          }
+        };
+
+        document.addEventListener('touchmove', touchMove, { passive: false });
+        document.addEventListener('touchend', touchEnd);
+      }, { passive: false });
 
       // Gestione del pulsante elimina
       el.querySelector('.delete-btn').addEventListener('click', e => {
