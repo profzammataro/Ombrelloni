@@ -262,20 +262,24 @@
     }
 
     zoomSlider.addEventListener('input', e => {
-      const oldZoom = zoomLevel;
-      zoomLevel = parseFloat(e.target.value);
-      
-      // Zoom verso il centro dello schermo
-      const centerX = window.innerWidth / 2;
-      const centerY = window.innerHeight / 2;
-      
-      // Calcola il nuovo offset per mantenere il centro fisso
-      const scaleFactor = zoomLevel / oldZoom;
-      mapOffsetX = centerX - (centerX - mapOffsetX) * scaleFactor;
-      mapOffsetY = centerY - (centerY - mapOffsetY) * scaleFactor;
-      
-      updateMapTransform();
-    });
+  const oldZoom = zoomLevel;
+  zoomLevel = parseFloat(e.target.value);
+
+  // Ottieni il centro visibile della mappa in coordinate mappa (non schermo)
+  const rect = mapWrapper.getBoundingClientRect();
+  const centerX = rect.width / 2;
+  const centerY = rect.height / 2;
+
+  const mapCenterX = (centerX - mapOffsetX) / oldZoom;
+  const mapCenterY = (centerY - mapOffsetY) / oldZoom;
+
+  // Calcola nuovo offset per mantenere lo stesso punto al centro dopo lo zoom
+  mapOffsetX = centerX - mapCenterX * zoomLevel;
+  mapOffsetY = centerY - mapCenterY * zoomLevel;
+
+  updateMapTransform();
+});
+
 
     // Variabili per il panning e doppio click
     let isPanning = false;
