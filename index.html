@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
@@ -84,13 +84,29 @@
       pointer-events: none;
     }
 
-    #zoom-slider {
-      position: absolute;
-      bottom: 10px;
+    #zoom-controls {
+      position: fixed;
+      bottom: 20px;
       left: 50%;
       transform: translateX(-50%);
-      z-index: 10;
+      z-index: 1000;
+      background: rgba(255,255,255,0.9);
+      padding: 10px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #zoom-slider {
       width: 200px;
+    }
+
+    #zoom-value {
+      font-weight: bold;
+      min-width: 40px;
+      text-align: center;
     }
 
     #modal-backdrop {
@@ -103,7 +119,7 @@
       background: rgba(0,0,0,0.5);
       justify-content: center;
       align-items: center;
-      z-index: 10;
+      z-index: 2000;
     }
 
     #edit-modal {
@@ -162,12 +178,37 @@
 
     #cancel-btn:hover { background-color: #e0e0e0; }
     #save-btn:hover { background-color: #0056b3; }
+
+    #instructions {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      background: rgba(255,255,255,0.9);
+      padding: 10px;
+      border-radius: 5px;
+      font-size: 12px;
+      z-index: 1000;
+      max-width: 200px;
+    }
   </style>
 </head>
 <body>
+  <div id="instructions">
+    <strong>Istruzioni:</strong><br>
+    • Doppio click: crea ombrellone<br>
+    • Click singolo: modifica ombrellone<br>
+    • Trascina per spostare<br>
+    • 🗑️ per eliminare
+  </div>
+
   <div id="map-wrapper">
     <div id="map"></div>
-    <input type="range" id="zoom-slider" min="1" max="3" step="0.1" value="1" />
+  </div>
+
+  <div id="zoom-controls">
+    <span>Zoom:</span>
+    <input type="range" id="zoom-slider" min="0.5" max="3" step="0.1" value="1" />
+    <span id="zoom-value">1.0x</span>
   </div>
 
   <div id="modal-backdrop">
@@ -202,6 +243,7 @@
 
     const map = document.getElementById('map');
     const zoomSlider = document.getElementById('zoom-slider');
+    const zoomValue = document.getElementById('zoom-value');
     const modalBackdrop = document.getElementById('modal-backdrop');
     const lettiniInput = document.getElementById('lettini-input');
     const openCheckbox = document.getElementById('open-checkbox');
@@ -215,24 +257,33 @@
 
     function updateMapTransform() {
       map.style.transform = `translate(${mapOffsetX}px, ${mapOffsetY}px) scale(${zoomLevel})`;
+      zoomValue.textContent = zoomLevel.toFixed(1) + 'x';
     }
 
     zoomSlider.addEventListener('input', e => {
       const oldZoom = zoomLevel;
       zoomLevel = parseFloat(e.target.value);
+      
+      // Zoom verso il centro dello schermo
       const centerX = window.innerWidth / 2;
       const centerY = window.innerHeight / 2;
-      mapOffsetX -= (centerX - mapOffsetX) * (zoomLevel - oldZoom) / oldZoom;
-      mapOffsetY -= (centerY - mapOffsetY) * (zoomLevel - oldZoom) / oldZoom;
+      
+      // Calcola il nuovo offset per mantenere il centro fisso
+      const scaleFactor = zoomLevel / oldZoom;
+      mapOffsetX = centerX - (centerX - mapOffsetX) * scaleFactor;
+      mapOffsetY = centerY - (centerY - mapOffsetY) * scaleFactor;
+      
       updateMapTransform();
     });
 
-    // Pan con mouse/touch
+    // Variabili per il panning
     let isPanning = false;
     let startX, startY, startOffsetX, startOffsetY;
 
+    // Touch events per mobile
     map.addEventListener('touchstart', e => {
       if (e.touches.length !== 1) return;
+      e.preventDefault();
       isPanning = true;
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
@@ -250,29 +301,38 @@
       updateMapTransform();
     }, { passive: false });
 
-    map.addEventListener('touchend', () => { isPanning = false; });
+    map.addEventListener('touchend', () => { 
+      isPanning = false; 
+    });
 
+    // Mouse events per desktop
     map.addEventListener('mousedown', e => {
+      if (e.target !== map) return; // Solo se clicchiamo direttamente sulla mappa
+      e.preventDefault();
       isPanning = true;
       startX = e.clientX;
       startY = e.clientY;
       startOffsetX = mapOffsetX;
       startOffsetY = mapOffsetY;
-      document.addEventListener('mousemove', panMouse);
-      document.addEventListener('mouseup', () => {
-        isPanning = false;
-        document.removeEventListener('mousemove', panMouse);
-      }, { once: true });
-    });
+      
+      const mouseMoveHandler = (moveEvent) => {
+        if (!isPanning) return;
+        const dx = moveEvent.clientX - startX;
+        const dy = moveEvent.clientY - startY;
+        mapOffsetX = startOffsetX + dx;
+        mapOffsetY = startOffsetY + dy;
+        updateMapTransform();
+      };
 
-    function panMouse(e) {
-      if (!isPanning) return;
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
-      mapOffsetX = startOffsetX + dx;
-      mapOffsetY = startOffsetY + dy;
-      updateMapTransform();
-    }
+      const mouseUpHandler = () => {
+        isPanning = false;
+        document.removeEventListener('mousemove', mouseMoveHandler);
+        document.removeEventListener('mouseup', mouseUpHandler);
+      };
+
+      document.addEventListener('mousemove', mouseMoveHandler);
+      document.addEventListener('mouseup', mouseUpHandler);
+    });
 
     function createUmbrella(data) {
       const el = document.createElement('div');
@@ -316,30 +376,55 @@
     }
 
     function addListeners(el) {
+      let isDragging = false;
+      let dragStartTime = 0;
+
       el.addEventListener('mousedown', e => {
         if (e.target.classList.contains('delete-btn')) return;
         e.preventDefault();
+        e.stopPropagation();
+        
+        isDragging = false;
+        dragStartTime = Date.now();
+        
         const startX = e.clientX;
         const startY = e.clientY;
         const origX = parseInt(el.style.left);
         const origY = parseInt(el.style.top);
 
         const move = ev => {
+          // Se ci spostiamo di più di 5px, consideriamo che stiamo trascinando
           const dx = ev.clientX - startX;
           const dy = ev.clientY - startY;
-          el.style.left = origX + dx + 'px';
-          el.style.top = origY + dy + 'px';
+          if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+            isDragging = true;
+          }
+          
+          if (isDragging) {
+            el.style.left = origX + dx + 'px';
+            el.style.top = origY + dy + 'px';
+          }
         };
 
         const up = () => {
           document.removeEventListener('mousemove', move);
           document.removeEventListener('mouseup', up);
-          const idx = umbrellas.findIndex(u => u.id == el.dataset.id);
-          if (idx !== -1) {
-            umbrellas[idx].x = parseInt(el.style.left);
-            umbrellas[idx].y = parseInt(el.style.top);
-            umbrellas[idx].mtime = Date.now();
-            set(ref(db, `umbrellas/${el.dataset.id}`), umbrellas[idx]);
+          
+          if (isDragging) {
+            // Salva la nuova posizione
+            const idx = umbrellas.findIndex(u => u.id == el.dataset.id);
+            if (idx !== -1) {
+              umbrellas[idx].x = parseInt(el.style.left);
+              umbrellas[idx].y = parseInt(el.style.top);
+              umbrellas[idx].mtime = Date.now();
+              set(ref(db, `umbrellas/${el.dataset.id}`), umbrellas[idx]);
+            }
+          } else {
+            // Se non abbiamo trascinato e il click è stato veloce, apri il modal
+            const clickDuration = Date.now() - dragStartTime;
+            if (clickDuration < 300) {
+              openEditModal(el);
+            }
           }
         };
 
@@ -347,20 +432,24 @@
         document.addEventListener('mouseup', up);
       });
 
+      // Gestione del pulsante elimina
       el.querySelector('.delete-btn').addEventListener('click', e => {
         e.stopPropagation();
-        remove(ref(db, `umbrellas/${el.dataset.id}`));
-        el.remove();
-      });
-
-      el.addEventListener('click', e => {
-        currentEl = el;
-        lettiniInput.value = el.dataset.lettini;
-        openCheckbox.checked = el.dataset.open === 'true';
-        modalBackdrop.style.display = 'flex';
+        if (confirm('Vuoi eliminare questo ombrellone?')) {
+          remove(ref(db, `umbrellas/${el.dataset.id}`));
+          el.remove();
+        }
       });
     }
 
+    function openEditModal(el) {
+      currentEl = el;
+      lettiniInput.value = el.dataset.lettini;
+      openCheckbox.checked = el.dataset.open === 'true';
+      modalBackdrop.style.display = 'flex';
+    }
+
+    // Gestione modal
     cancelBtn.addEventListener('click', () => {
       modalBackdrop.style.display = 'none';
       currentEl = null;
@@ -385,6 +474,14 @@
       currentEl = null;
     });
 
+    // Chiudi modal cliccando fuori
+    modalBackdrop.addEventListener('click', e => {
+      if (e.target === modalBackdrop) {
+        modalBackdrop.style.display = 'none';
+        currentEl = null;
+      }
+    });
+
     function load() {
       onValue(ref(db, 'umbrellas'), snapshot => {
         map.innerHTML = '';
@@ -397,24 +494,37 @@
       });
     }
 
+    // Gestione doppio click per creare ombrelloni
+    let lastClickTime = 0;
     map.addEventListener('click', e => {
       if (e.target !== map) return;
-      const rect = map.getBoundingClientRect();
-      const x = (e.clientX - rect.left - mapOffsetX) / zoomLevel;
-      const y = (e.clientY - rect.top - mapOffsetY) / zoomLevel;
-      const id = Date.now() + Math.random();
-      const newUmbrella = {
-        id,
-        lettini: '2',
-        open: false,
-        x,
-        y,
-        mtime: Date.now()
-      };
-      umbrellas.push(newUmbrella);
-      set(ref(db, `umbrellas/${id}`), newUmbrella);
+      
+      const currentTime = Date.now();
+      const timeDiff = currentTime - lastClickTime;
+      
+      if (timeDiff < 500) { // Doppio click entro 500ms
+        e.preventDefault();
+        const rect = map.getBoundingClientRect();
+        const x = (e.clientX - rect.left - mapOffsetX) / zoomLevel;
+        const y = (e.clientY - rect.top - mapOffsetY) / zoomLevel;
+        const id = Date.now() + Math.random();
+        const newUmbrella = {
+          id,
+          lettini: '2',
+          open: false,
+          x,
+          y,
+          mtime: Date.now()
+        };
+        umbrellas.push(newUmbrella);
+        set(ref(db, `umbrellas/${id}`), newUmbrella);
+      }
+      
+      lastClickTime = currentTime;
     });
 
+    // Inizializza
+    updateMapTransform();
     load();
   </script>
 </body>
