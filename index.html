@@ -1,657 +1,476 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>Gestione Ombrelloni</title>
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      font-family: sans-serif;
-      background-color: #f4e7c5;
-      -webkit-user-select: none;
-      -webkit-touch-callout: none;
-      user-select: none;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestione Ombrelloni Spiaggia</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #f4e4bc 0%, #e6d49f 50%, #d4c189 100%);
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+        }
 
-    #map-wrapper {
-      width: 100vw;
-      height: 100vh;
-      overflow: hidden;
-      position: relative;
-      touch-action: none;
-    }
+        .controls {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
 
-    #map {
-      width: 100%;
-      height: 100%;
-      position: absolute;
-      top: 0;
-      left: 0;
-      transform-origin: center center;
-    }
+        .zoom-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
 
-    .umbrella {
-      width: 140px;
-      height: 140px;
-      border-radius: 50%;
-      position: absolute;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      font-size: 40px;
-      font-weight: bold;
-      color: #000;
-      box-sizing: border-box;
-      border: 2px solid #333;
-      background-color: gray;
-      text-align: center;
-      padding: 10px;
-      cursor: grab;
-      touch-action: none;
-    }
+        .zoom-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
 
-    .umbrella.open { background-color: green; }
-    .umbrella.closed { background-color: red; }
+        .zoom-btn:hover {
+            background: #45a049;
+        }
 
-    .delete-btn {
-      position: absolute;
-      top: 2px;
-      right: 4px;
-      cursor: pointer;
-      font-size: 18px;
-      color: black;
-      user-select: none;
-      z-index: 1;
-      padding: 5px;
-      background: rgba(255,255,255,0.8);
-      border-radius: 50%;
-      width: 30px;
-      height: 30px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+        .beach-container {
+            width: 100vw;
+            height: 100vh;
+            cursor: crosshair;
+            transform-origin: 0 0;
+            transition: transform 0.2s ease;
+        }
 
-    .date-label {
-      position: absolute;
-      bottom: 2px;
-      font-size: 10px;
-      width: 100%;
-      text-align: center;
-      pointer-events: none;
-    }
+        .umbrella {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            cursor: move;
+            user-select: none;
+        }
 
-    #zoom-controls {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 1000;
-      background: rgba(255,255,255,0.9);
-      padding: 10px;
-      border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
+        .umbrella-circle {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #4CAF50;
+            border: 3px solid #2E7D32;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+            position: relative;
+            transition: background-color 0.3s ease;
+        }
 
-    #zoom-slider {
-      width: 200px;
-    }
+        .umbrella.open .umbrella-circle {
+            background: #f44336;
+            border-color: #c62828;
+        }
 
-    #zoom-value {
-      font-weight: bold;
-      min-width: 40px;
-      text-align: center;
-    }
+        .umbrella-pole {
+            position: absolute;
+            width: 2px;
+            height: 20px;
+            background: #8D6E63;
+            left: 50%;
+            top: 100%;
+            transform: translateX(-50%);
+        }
 
-    #modal-backdrop {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(0,0,0,0.5);
-      justify-content: center;
-      align-items: center;
-      z-index: 2000;
-    }
+        .delete-btn {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            width: 20px;
+            height: 20px;
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
 
-    #edit-modal {
-      background: white;
-      padding: 20px;
-      border-radius: 8px;
-      min-width: 300px;
-      max-width: 90vw;
-      box-shadow: 0 0 10px rgba(0,0,0,0.5);
-    }
+        .umbrella:hover .delete-btn {
+            opacity: 1;
+        }
 
-    #edit-modal h3 { margin-top: 0; }
+        .delete-btn:hover {
+            background: #c62828;
+        }
 
-    #edit-modal label {
-      display: block;
-      margin: 15px 0 5px;
-      font-weight: bold;
-    }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
 
-    #edit-modal input[type="number"] {
-      width: 100%;
-      padding: 10px;
-      font-size: 16px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-    }
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 300px;
+            max-width: 90%;
+        }
 
-    #edit-modal input[type="checkbox"] {
-      margin-right: 8px;
-      transform: scale(1.2);
-    }
+        .modal h3 {
+            margin-top: 0;
+            color: #333;
+        }
 
-    #edit-modal-buttons {
-      margin-top: 20px;
-      text-align: right;
-    }
+        .modal label {
+            display: block;
+            margin: 10px 0 5px 0;
+            color: #555;
+        }
 
-    #edit-modal-buttons button {
-      margin-left: 10px;
-      padding: 10px 20px;
-      font-size: 16px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
+        .modal input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
 
-    #cancel-btn {
-      background-color: #f0f0f0;
-      color: #333;
-    }
+        .modal input[type="checkbox"] {
+            margin-right: 8px;
+        }
 
-    #save-btn {
-      background-color: #007bff;
-      color: white;
-    }
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
 
-    #cancel-btn:hover { background-color: #e0e0e0; }
-    #save-btn:hover { background-color: #0056b3; }
+        .modal-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
 
-    #instructions {
-      position: fixed;
-      top: 10px;
-      left: 10px;
-      background: rgba(255,255,255,0.9);
-      padding: 10px;
-      border-radius: 5px;
-      font-size: 12px;
-      z-index: 1000;
-      max-width: 200px;
-    }
-  </style>
+        .save-btn {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .save-btn:hover {
+            background: #45a049;
+        }
+
+        .cancel-btn {
+            background: #757575;
+            color: white;
+        }
+
+        .cancel-btn:hover {
+            background: #616161;
+        }
+
+        .confirm-modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .confirm-content {
+            background-color: white;
+            margin: 20% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 300px;
+            max-width: 90%;
+            text-align: center;
+        }
+    </style>
 </head>
 <body>
-  <div id="instructions">
-    <strong>Istruzioni:</strong><br>
-    • Doppio click/tap: crea ombrellone<br>
-    • Click/tap singolo: modifica ombrellone<br>
-    • Trascina per spostare<br>
-    • 🗑️ per eliminare
-  </div>
-
-  <div id="map-wrapper">
-    <div id="map"></div>
-  </div>
-
-  <div id="zoom-controls">
-    <span>Zoom:</span>
-    <input type="range" id="zoom-slider" min="0.1" max="2" step="0.05" value="1" />
-    <span id="zoom-value">1.0x</span>
-  </div>
-
-  <div id="modal-backdrop">
-    <div id="edit-modal">
-      <h3>Modifica Ombrellone</h3>
-      <label for="lettini-input">Numero lettini:</label>
-      <input type="number" id="lettini-input" min="0" max="10">
-      <label><input type="checkbox" id="open-checkbox"> Ombrellone aperto</label>
-      <div id="edit-modal-buttons">
-        <button id="cancel-btn">Annulla</button>
-        <button id="save-btn">Salva</button>
-      </div>
+    <div class="controls">
+        <div class="zoom-controls">
+            <button class="zoom-btn" onclick="zoomIn()">+</button>
+            <span id="zoom-level">100%</span>
+            <button class="zoom-btn" onclick="zoomOut()">-</button>
+        </div>
     </div>
-  </div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
-    import { getDatabase, ref, onValue, set, remove } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-database.js";
+    <div class="beach-container" id="beachContainer" onclick="addUmbrella(event)">
+    </div>
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyAxqgScWEda7AoGWxWkFBCgVFjDvMks5SU",
-      authDomain: "ombrelloni-ee9aa.firebaseapp.com",
-      databaseURL: "https://ombrelloni-ee9aa-default-rtdb.europe-west1.firebasedatabase.app",
-      projectId: "ombrelloni-ee9aa",
-      storageBucket: "ombrelloni-ee9aa.appspot.com",
-      messagingSenderId: "781899782985",
-      appId: "1:781899782985:web:a0c2039509531c1c9c1898"
-    };
+    <!-- Modal per la modifica dell'ombrellone -->
+    <div id="umbrellaModal" class="modal">
+        <div class="modal-content">
+            <h3>Modifica Ombrellone</h3>
+            <label for="bedCount">Numero lettini:</label>
+            <input type="number" id="bedCount" min="1" max="10" value="2">
+            
+            <label>
+                <input type="checkbox" id="isOpen"> Aperto
+            </label>
+            
+            <div class="modal-buttons">
+                <button class="modal-btn save-btn" onclick="saveUmbrella()">Salva</button>
+                <button class="modal-btn cancel-btn" onclick="closeModal()">Annulla</button>
+            </div>
+        </div>
+    </div>
 
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
+    <!-- Modal di conferma eliminazione -->
+    <div id="confirmModal" class="confirm-modal">
+        <div class="confirm-content">
+            <h3>Conferma eliminazione</h3>
+            <p>Sei sicuro di voler eliminare questo ombrellone?</p>
+            <div class="modal-buttons">
+                <button class="modal-btn save-btn" onclick="confirmDelete()">Sì</button>
+                <button class="modal-btn cancel-btn" onclick="cancelDelete()">No</button>
+            </div>
+        </div>
+    </div>
 
-    const mapWrapper = document.getElementById('map-wrapper');
-    const map = document.getElementById('map');
-    const zoomSlider = document.getElementById('zoom-slider');
-    const zoomValue = document.getElementById('zoom-value');
-    const modalBackdrop = document.getElementById('modal-backdrop');
-    const lettiniInput = document.getElementById('lettini-input');
-    const openCheckbox = document.getElementById('open-checkbox');
-    const cancelBtn = document.getElementById('cancel-btn');
-    const saveBtn = document.getElementById('save-btn');
+    <script>
+        let umbrellaCounter = 0;
+        let currentZoom = 1;
+        let currentUmbrella = null;
+        let umbrellaToDelete = null;
+        let isDragging = false;
+        let dragStartX = 0;
+        let dragStartY = 0;
 
-    let umbrellas = [];
-    let currentEl = null;
-    let zoomLevel = 1;
-    let mapOffsetX = 0, mapOffsetY = 0;
+        function addUmbrella(event) {
+            if (isDragging || event.target !== event.currentTarget || event.target.closest('.umbrella')) return;
 
-    function updateMapTransform() {
-      map.style.transform = `translate(${mapOffsetX}px, ${mapOffsetY}px) scale(${zoomLevel})`;
-      zoomValue.textContent = zoomLevel.toFixed(1) + 'x';
-    }
+            const rect = event.currentTarget.getBoundingClientRect();
+            const x = (event.clientX - rect.left) / currentZoom;
+            const y = (event.clientY - rect.top) / currentZoom;
 
-    zoomSlider.addEventListener('input', e => {
-      const oldZoom = zoomLevel;
-      zoomLevel = parseFloat(e.target.value);
-      
-      // Zoom verso il centro dello schermo
-      const centerX = window.innerWidth / 2;
-      const centerY = window.innerHeight / 2;
-      
-      // Calcola il nuovo offset per mantenere il centro fisso
-      const scaleFactor = zoomLevel / oldZoom;
-      mapOffsetX = centerX - (centerX - mapOffsetX) * scaleFactor;
-      mapOffsetY = centerY - (centerY - mapOffsetY) * scaleFactor;
-      
-      updateMapTransform();
-    });
+            const umbrella = document.createElement('div');
+            umbrella.className = 'umbrella';
+            umbrella.style.left = (x - 30) + 'px';
+            umbrella.style.top = (y - 30) + 'px';
+            umbrella.id = 'umbrella-' + (++umbrellaCounter);
+            
+            umbrella.innerHTML = `
+                <div class="umbrella-circle">2</div>
+                <div class="umbrella-pole"></div>
+                <button class="delete-btn" onclick="deleteUmbrella('${umbrella.id}')" title="Elimina">🗑️</button>
+            `;
 
-    // Variabili globali per la gestione degli eventi
-    let isPanning = false;
-    let startX, startY, startOffsetX, startOffsetY;
-    let lastTapTime = 0;
-    let tapCount = 0;
-    let tapTimeout = null;
+            umbrella.onclick = function(e) {
+                e.stopPropagation();
+                if (!isDragging) {
+                    editUmbrella(umbrella);
+                }
+            };
 
-    // Funzione per creare un nuovo ombrellone
-    function createNewUmbrella(clientX, clientY) {
-      const rect = mapWrapper.getBoundingClientRect();
-      const x = (clientX - rect.left - mapOffsetX) / zoomLevel;
-      const y = (clientY - rect.top - mapOffsetY) / zoomLevel;
-      
-      console.log('Creazione ombrellone a:', x, y);
-      
-      const id = Date.now() + Math.random();
-      const newUmbrella = {
-        id,
-        lettini: '2',
-        open: false,
-        x: Math.round(x),
-        y: Math.round(y),
-        mtime: Date.now()
-      };
-      
-      umbrellas.push(newUmbrella);
-      set(ref(db, `umbrellas/${id}`), newUmbrella);
-      createUmbrella(newUmbrella);
-    }
+            // Drag and drop per mouse
+            umbrella.onmousedown = function(e) {
+                if (e.target.classList.contains('delete-btn')) return;
+                
+                isDragging = false;
+                dragStartX = e.clientX;
+                dragStartY = e.clientY;
+                
+                const startX = parseInt(umbrella.style.left);
+                const startY = parseInt(umbrella.style.top);
+                
+                function onMouseMove(e) {
+                    const deltaX = e.clientX - dragStartX;
+                    const deltaY = e.clientY - dragStartY;
+                    
+                    if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+                        isDragging = true;
+                    }
+                    
+                    if (isDragging) {
+                        umbrella.style.left = (startX + deltaX / currentZoom) + 'px';
+                        umbrella.style.top = (startY + deltaY / currentZoom) + 'px';
+                    }
+                }
+                
+                function onMouseUp() {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                    
+                    setTimeout(() => {
+                        isDragging = false;
+                    }, 100);
+                }
+                
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+                e.preventDefault();
+            };
 
-    // Gestione mouse events per desktop
-    mapWrapper.addEventListener('mousedown', e => {
-      if (e.target.closest('.umbrella')) return;
-      
-      e.preventDefault();
-      isPanning = true;
-      startX = e.clientX;
-      startY = e.clientY;
-      startOffsetX = mapOffsetX;
-      startOffsetY = mapOffsetY;
-      
-      const mouseMoveHandler = (moveEvent) => {
-        if (!isPanning) return;
-        const dx = moveEvent.clientX - startX;
-        const dy = moveEvent.clientY - startY;
-        mapOffsetX = startOffsetX + dx;
-        mapOffsetY = startOffsetY + dy;
-        updateMapTransform();
-      };
+            // Drag and drop per touch
+            umbrella.ontouchstart = function(e) {
+                if (e.target.classList.contains('delete-btn')) return;
+                
+                isDragging = false;
+                const touch = e.touches[0];
+                dragStartX = touch.clientX;
+                dragStartY = touch.clientY;
+                
+                const startX = parseInt(umbrella.style.left);
+                const startY = parseInt(umbrella.style.top);
+                
+                function onTouchMove(e) {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const deltaX = touch.clientX - dragStartX;
+                    const deltaY = touch.clientY - dragStartY;
+                    
+                    if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+                        isDragging = true;
+                    }
+                    
+                    if (isDragging) {
+                        umbrella.style.left = (startX + deltaX / currentZoom) + 'px';
+                        umbrella.style.top = (startY + deltaY / currentZoom) + 'px';
+                    }
+                }
+                
+                function onTouchEnd() {
+                    document.removeEventListener('touchmove', onTouchMove);
+                    document.removeEventListener('touchend', onTouchEnd);
+                    
+                    setTimeout(() => {
+                        isDragging = false;
+                    }, 100);
+                }
+                
+                document.addEventListener('touchmove', onTouchMove, { passive: false });
+                document.addEventListener('touchend', onTouchEnd);
+                e.preventDefault();
+            };
 
-      const mouseUpHandler = () => {
-        isPanning = false;
-        document.removeEventListener('mousemove', mouseMoveHandler);
-        document.removeEventListener('mouseup', mouseUpHandler);
-      };
-
-      document.addEventListener('mousemove', mouseMoveHandler);
-      document.addEventListener('mouseup', mouseUpHandler);
-    });
-
-    // Gestione doppio click per desktop
-    mapWrapper.addEventListener('dblclick', e => {
-      if (e.target.closest('.umbrella')) return;
-      e.preventDefault();
-      createNewUmbrella(e.clientX, e.clientY);
-    });
-
-    // Gestione touch events per mobile con doppio tap
-    mapWrapper.addEventListener('touchstart', e => {
-      if (e.target.closest('.umbrella')) return;
-      if (e.touches.length !== 1) return;
-      
-      const touch = e.touches[0];
-      const currentTime = Date.now();
-      
-      // Gestione doppio tap
-      if (currentTime - lastTapTime < 500) {
-        // Doppio tap rilevato
-        e.preventDefault();
-        clearTimeout(tapTimeout);
-        createNewUmbrella(touch.clientX, touch.clientY);
-        tapCount = 0;
-        lastTapTime = 0;
-        return;
-      }
-      
-      // Primo tap - inizia il panning solo se non è un doppio tap
-      lastTapTime = currentTime;
-      tapCount = 1;
-      
-      // Timeout per distinguere tra singolo tap e inizio di doppio tap
-      tapTimeout = setTimeout(() => {
-        // È un singolo tap, inizia il panning
-        if (tapCount === 1) {
-          isPanning = true;
-          startX = touch.clientX;
-          startY = touch.clientY;
-          startOffsetX = mapOffsetX;
-          startOffsetY = mapOffsetY;
+            document.getElementById('beachContainer').appendChild(umbrella);
         }
-      }, 200);
-    }, { passive: false });
 
-    mapWrapper.addEventListener('touchmove', e => {
-      if (e.target.closest('.umbrella')) return;
-      if (!isPanning || e.touches.length !== 1) return;
-      
-      e.preventDefault();
-      const touch = e.touches[0];
-      const dx = touch.clientX - startX;
-      const dy = touch.clientY - startY;
-      mapOffsetX = startOffsetX + dx;
-      mapOffsetY = startOffsetY + dy;
-      updateMapTransform();
-    }, { passive: false });
+        function editUmbrella(umbrella) {
+            currentUmbrella = umbrella;
+            const circle = umbrella.querySelector('.umbrella-circle');
+            const bedCount = parseInt(circle.textContent);
+            const isOpen = umbrella.classList.contains('open');
+            
+            document.getElementById('bedCount').value = bedCount;
+            document.getElementById('isOpen').checked = isOpen;
+            document.getElementById('umbrellaModal').style.display = 'block';
+        }
 
-    mapWrapper.addEventListener('touchend', e => {
-      isPanning = false;
-    });
-
-    function createUmbrella(data) {
-      const el = document.createElement('div');
-      el.className = 'umbrella';
-      el.style.left = data.x + 'px';
-      el.style.top = data.y + 'px';
-      el.dataset.id = data.id;
-      el.dataset.lettini = data.lettini;
-      el.dataset.open = data.open;
-      el.dataset.mtime = data.mtime;
-      map.appendChild(el);
-      render(el);
-    }
-
-    function render(el) {
-      const lettini = el.dataset.lettini;
-      const open = el.dataset.open === 'true';
-      const date = new Date(parseInt(el.dataset.mtime || Date.now()));
-      el.classList.toggle('open', open);
-      el.classList.toggle('closed', !open);
-      el.innerHTML = '';
-
-      const deleteBtn = document.createElement('div');
-      deleteBtn.className = 'delete-btn';
-      deleteBtn.title = 'Elimina';
-      deleteBtn.textContent = '🗑️';
-
-      const dateLabel = document.createElement('div');
-      dateLabel.className = 'date-label';
-      dateLabel.textContent = date.toLocaleString('it-IT', {
-        day: '2-digit',
-        month: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-
-      el.appendChild(deleteBtn);
-      el.appendChild(dateLabel);
-      el.appendChild(document.createTextNode(lettini));
-      addListeners(el);
-    }
-
-    function addListeners(el) {
-      let isDragging = false;
-      let dragStartTime = 0;
-
-      // Mouse events per desktop
-      el.addEventListener('mousedown', e => {
-        if (e.target.classList.contains('delete-btn')) return;
-        e.preventDefault();
-        e.stopPropagation();
-        
-        isDragging = false;
-        dragStartTime = Date.now();
-        
-        const startX = e.clientX;
-        const startY = e.clientY;
-        const origX = parseInt(el.style.left);
-        const origY = parseInt(el.style.top);
-
-        const move = ev => {
-          const dx = ev.clientX - startX;
-          const dy = ev.clientY - startY;
-          if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
-            isDragging = true;
-          }
-          
-          if (isDragging) {
-            el.style.left = (origX + dx / zoomLevel) + 'px';
-            el.style.top = (origY + dy / zoomLevel) + 'px';
-          }
-        };
-
-        const up = () => {
-          document.removeEventListener('mousemove', move);
-          document.removeEventListener('mouseup', up);
-          
-          if (isDragging) {
-            const idx = umbrellas.findIndex(u => u.id == el.dataset.id);
-            if (idx !== -1) {
-              umbrellas[idx].x = parseInt(el.style.left);
-              umbrellas[idx].y = parseInt(el.style.top);
-              umbrellas[idx].mtime = Date.now();
-              set(ref(db, `umbrellas/${el.dataset.id}`), umbrellas[idx]);
+        function saveUmbrella() {
+            if (!currentUmbrella) return;
+            
+            const bedCount = document.getElementById('bedCount').value;
+            const isOpen = document.getElementById('isOpen').checked;
+            
+            const circle = currentUmbrella.querySelector('.umbrella-circle');
+            circle.textContent = bedCount;
+            
+            if (isOpen) {
+                currentUmbrella.classList.add('open');
+            } else {
+                currentUmbrella.classList.remove('open');
             }
-          } else {
-            const clickDuration = Date.now() - dragStartTime;
-            if (clickDuration < 300) {
-              openEditModal(el);
+            
+            closeModal();
+        }
+
+        function closeModal() {
+            document.getElementById('umbrellaModal').style.display = 'none';
+            currentUmbrella = null;
+        }
+
+        function deleteUmbrella(umbrellaId) {
+            event.stopPropagation();
+            umbrellaToDelete = document.getElementById(umbrellaId);
+            document.getElementById('confirmModal').style.display = 'block';
+        }
+
+        function confirmDelete() {
+            if (umbrellaToDelete) {
+                umbrellaToDelete.remove();
+                umbrellaToDelete = null;
             }
-          }
-        };
-
-        document.addEventListener('mousemove', move);
-        document.addEventListener('mouseup', up);
-      });
-
-      // Touch events per mobile con gestione migliorata
-      let umbrellaLastTapTime = 0;
-      
-      el.addEventListener('touchstart', e => {
-        if (e.target.classList.contains('delete-btn')) return;
-        e.preventDefault();
-        e.stopPropagation();
-        
-        const touch = e.touches[0];
-        const currentTime = Date.now();
-        
-        // Gestione doppio tap sull'ombrellone per modifica
-        if (currentTime - umbrellaLastTapTime < 500) {
-          // Doppio tap - apri modal di modifica
-          openEditModal(el);
-          umbrellaLastTapTime = 0;
-          return;
+            document.getElementById('confirmModal').style.display = 'none';
         }
-        
-        umbrellaLastTapTime = currentTime;
-        isDragging = false;
-        dragStartTime = Date.now();
-        
-        const startX = touch.clientX;
-        const startY = touch.clientY;
-        const origX = parseInt(el.style.left);
-        const origY = parseInt(el.style.top);
 
-        const touchMove = ev => {
-          if (ev.touches.length !== 1) return;
-          const touch = ev.touches[0];
-          const dx = touch.clientX - startX;
-          const dy = touch.clientY - startY;
-          
-          if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
-            isDragging = true;
-          }
-          
-          if (isDragging) {
-            ev.preventDefault();
-            el.style.left = (origX + dx / zoomLevel) + 'px';
-            el.style.top = (origY + dy / zoomLevel) + 'px';
-          }
-        };
+        function cancelDelete() {
+            umbrellaToDelete = null;
+            document.getElementById('confirmModal').style.display = 'none';
+        }
 
-        const touchEnd = () => {
-          document.removeEventListener('touchmove', touchMove);
-          document.removeEventListener('touchend', touchEnd);
-          
-          if (isDragging) {
-            const idx = umbrellas.findIndex(u => u.id == el.dataset.id);
-            if (idx !== -1) {
-              umbrellas[idx].x = parseInt(el.style.left);
-              umbrellas[idx].y = parseInt(el.style.top);
-              umbrellas[idx].mtime = Date.now();
-              set(ref(db, `umbrellas/${el.dataset.id}`), umbrellas[idx]);
+        function zoomIn() {
+            currentZoom = Math.min(currentZoom * 1.2, 3);
+            updateZoom();
+        }
+
+        function zoomOut() {
+            currentZoom = Math.max(currentZoom / 1.2, 0.3);
+            updateZoom();
+        }
+
+        function updateZoom() {
+            const container = document.getElementById('beachContainer');
+            container.style.transform = `scale(${currentZoom})`;
+            document.getElementById('zoom-level').textContent = Math.round(currentZoom * 100) + '%';
+        }
+
+        // Chiudi modal cliccando fuori
+        window.onclick = function(event) {
+            const modal = document.getElementById('umbrellaModal');
+            const confirmModal = document.getElementById('confirmModal');
+            if (event.target === modal) {
+                closeModal();
             }
-          }
-        };
-
-        document.addEventListener('touchmove', touchMove, { passive: false });
-        document.addEventListener('touchend', touchEnd);
-      }, { passive: false });
-
-      // Versione alternativa per singolo tap (se necessario)
-      el.addEventListener('click', e => {
-        if (e.target.classList.contains('delete-btn')) return;
-        e.preventDefault();
-        e.stopPropagation();
-        
-        // Solo per desktop - il touch è gestito sopra
-        if (e.type === 'click' && !('ontouchstart' in window)) {
-          openEditModal(el);
+            if (event.target === confirmModal) {
+                cancelDelete();
+            }
         }
-      });
 
-      // Gestione del pulsante elimina
-      el.querySelector('.delete-btn').addEventListener('click', e => {
-        e.stopPropagation();
-        if (confirm('Vuoi eliminare questo ombrellone?')) {
-          remove(ref(db, `umbrellas/${el.dataset.id}`));
-          el.remove();
-          const idx = umbrellas.findIndex(u => u.id == el.dataset.id);
-          if (idx !== -1) {
-            umbrellas.splice(idx, 1);
-          }
-        }
-      });
-
-      // Gestione touch del pulsante elimina
-      el.querySelector('.delete-btn').addEventListener('touchend', e => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (confirm('Vuoi eliminare questo ombrellone?')) {
-          remove(ref(db, `umbrellas/${el.dataset.id}`));
-          el.remove();
-          const idx = umbrellas.findIndex(u => u.id == el.dataset.id);
-          if (idx !== -1) {
-            umbrellas.splice(idx, 1);
-          }
-        }
-      });
-    }
-
-    function openEditModal(el) {
-      currentEl = el;
-      lettiniInput.value = el.dataset.lettini;
-      openCheckbox.checked = el.dataset.open === 'true';
-      modalBackdrop.style.display = 'flex';
-    }
-
-    // Gestione modal
-    cancelBtn.addEventListener('click', () => {
-      modalBackdrop.style.display = 'none';
-      currentEl = null;
-    });
-
-    saveBtn.addEventListener('click', () => {
-      if (!currentEl) return;
-      currentEl.dataset.lettini = lettiniInput.value || '2';
-      currentEl.dataset.open = openCheckbox.checked;
-      currentEl.dataset.mtime = Date.now();
-      render(currentEl);
-
-      const idx = umbrellas.findIndex(u => u.id == currentEl.dataset.id);
-      if (idx !== -1) {
-        umbrellas[idx].lettini = currentEl.dataset.lettini;
-        umbrellas[idx].open = openCheckbox.checked;
-        umbrellas[idx].mtime = Date.now();
-        set(ref(db, `umbrellas/${currentEl.dataset.id}`), umbrellas[idx]);
-      }
-
-      modalBackdrop.style.display = 'none';
-      currentEl = null;
-    });
-
-    // Chiudi modal cliccando fuori
-    modalBackdrop.addEventListener('click', e => {
-      if (e.target === modalBackdrop) {
-        modalBackdrop.style.display = 'none';
-        currentEl = null;
-      }
-    });
-
-    function load() {
-      onValue(ref(db, 'umbrellas'), snapshot => {
-        map.innerHTML = '';
-        umbrellas = [];
-        const data = snapshot.val() || {};
-        for (const id in data) {
-          umbrellas.push(data[id]);
-          createUmbrella(data[id]);
-        }
-      });
-    }
-
-    // Inizializza
-    updateMapTransform();
-    load();
-  </script>
+        // Supporto touch per dispositivi mobili - solo per aggiungere ombrelloni
+        document.getElementById('beachContainer').addEventListener('touchstart', function(e) {
+            if (e.touches.length === 1 && !e.target.closest('.umbrella')) {
+                const touch = e.touches[0];
+                const mouseEvent = new MouseEvent('click', {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY,
+                    bubbles: true
+                });
+                this.dispatchEvent(mouseEvent);
+            }
+        });
+    </script>
 </body>
 </html>
