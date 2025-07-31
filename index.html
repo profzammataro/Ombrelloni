@@ -97,17 +97,17 @@
       width: 100vw;
       height: 100vh;
       background: rgba(0,0,0,0.5);
-      justify-content: center;
-      align-items: center;
       z-index: 10;
     }
 
     #edit-modal {
+      position: absolute;
       background: white;
       padding: 20px;
       border-radius: 8px;
       min-width: 300px;
       box-shadow: 0 0 10px rgba(0,0,0,0.5);
+      transform: translate(-50%, -50%);
     }
 
     #edit-modal label {
@@ -170,6 +170,7 @@
 
     const map = document.getElementById('map');
     const modalBackdrop = document.getElementById('modal-backdrop');
+    const editModal = document.getElementById('edit-modal');
     const lettiniInput = document.getElementById('lettini-input');
     const openCheckbox = document.getElementById('open-checkbox');
     const cancelBtn = document.getElementById('cancel-btn');
@@ -234,6 +235,38 @@
       addListeners(el);
     }
 
+    function positionModal(umbrellaEl) {
+      const rect = umbrellaEl.getBoundingClientRect();
+      const mapRect = map.getBoundingClientRect();
+      
+      // Calcola la posizione del centro dell'ombrellone rispetto alla mappa
+      const umbrellaX = rect.left + rect.width / 2 - mapRect.left;
+      const umbrellaY = rect.top + rect.height / 2 - mapRect.top;
+      
+      // Posiziona il modal al centro dell'ombrellone
+      editModal.style.left = umbrellaX + 'px';
+      editModal.style.top = umbrellaY + 'px';
+      
+      // Assicurati che il modal non esca dai bordi dello schermo
+      const modalRect = editModal.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      
+      // Aggiusta la posizione se il modal esce dallo schermo
+      if (modalRect.right > viewportWidth) {
+        editModal.style.left = (umbrellaX - (modalRect.right - viewportWidth) - 20) + 'px';
+      }
+      if (modalRect.left < 0) {
+        editModal.style.left = '20px';
+      }
+      if (modalRect.bottom > viewportHeight) {
+        editModal.style.top = (umbrellaY - (modalRect.bottom - viewportHeight) - 20) + 'px';
+      }
+      if (modalRect.top < 0) {
+        editModal.style.top = '20px';
+      }
+    }
+
     function addListeners(el) {
       const deleteBtn = el.querySelector('.delete-btn');
       
@@ -257,7 +290,12 @@
         currentEl = el;
         lettiniInput.value = el.dataset.lettini;
         openCheckbox.checked = el.dataset.open === 'true';
-        modalBackdrop.style.display = 'flex';
+        modalBackdrop.style.display = 'block';
+        
+        // Posiziona il modal sopra l'ombrellone dopo un breve delay per permettere il rendering
+        setTimeout(() => {
+          positionModal(el);
+        }, 10);
       };
 
       let isDragging = false;
@@ -368,6 +406,14 @@
       if (idx !== -1) saveUmbrella(umbrellas[idx]);
       modalBackdrop.style.display = 'none';
       currentEl = null;
+    };
+
+    // Chiudi modal cliccando sul backdrop
+    modalBackdrop.onclick = e => {
+      if (e.target === modalBackdrop) {
+        modalBackdrop.style.display = 'none';
+        currentEl = null;
+      }
     };
 
     load();
