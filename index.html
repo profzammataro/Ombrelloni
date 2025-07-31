@@ -1,661 +1,376 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
-    <title>Gestione Ombrelloni Spiaggia</title>
-    <style>
-        * {
-            box-sizing: border-box;
-        }
+  <meta charset="UTF-8">
+  <title>Gestione Ombrelloni Online</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background-color: #f4e7c5;
+    }
 
-        body {
-            margin: 0;
-            padding: 0;
-            background: linear-gradient(135deg, #f4e4bc 0%, #e6d49f 50%, #d4c189 100%);
-            font-family: Arial, sans-serif;
-            overflow: hidden;
-            height: 100vh;
-            user-select: none;
-            -webkit-user-select: none;
-            -webkit-touch-callout: none;
-            -webkit-tap-highlight-color: transparent;
-            touch-action: none;
-        }
+    #map {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+      cursor: crosshair;
+    }
 
-        .controls {
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            z-index: 1000;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 10px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-            touch-action: manipulation;
-        }
+    .umbrella {
+      width: 140px;
+      height: 140px;
+      position: absolute;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 40px;
+      font-weight: bold;
+      color: #000;
+      box-sizing: border-box;
+      cursor: grab;
+      border: 2px solid #333;
+      background-color: gray;
+      text-align: center;
+      padding: 10px;
+      /* Forma esagonale usando clip-path */
+      clip-path: polygon(30% 0%, 70% 0%, 100% 50%, 70% 100%, 30% 100%, 0% 50%);
+      transition: transform 0.2s ease, box-shadow 0.2s ease, z-index 0.2s ease;
+      user-select: none;
+      touch-action: none;
+    }
 
-        .zoom-controls {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
+    .umbrella:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
 
-        .zoom-btn {
-            background: #4CAF50;
-            color: white;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-        }
+    .umbrella.dragging {
+      cursor: grabbing;
+      transform: scale(1.1) rotate(2deg);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+      z-index: 1000;
+      transition: none;
+    }
 
-        .zoom-btn:hover {
-            background: #45a049;
-        }
+    .umbrella.open {
+      background-color: green;
+    }
 
-        .clear-btn {
-            background: #f44336;
-            color: white;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            margin-top: 5px;
-        }
+    .umbrella.closed {
+      background-color: red;
+    }
 
-        .clear-btn:hover {
-            background: #d32f2f;
-        }
+    .delete-btn {
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      cursor: pointer;
+      font-size: 18px;
+      color: black;
+      user-select: none;
+      z-index: 1;
+      padding: 2px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.8);
+      transition: background-color 0.2s ease, transform 0.2s ease;
+    }
 
-        .beach-container {
-            width: 100vw;
-            height: 100vh;
-            cursor: crosshair;
-            transform-origin: 0 0;
-            transition: transform 0.2s ease;
-            position: relative;
-        }
+    .delete-btn:hover {
+      background: rgba(255, 0, 0, 0.2);
+      transform: scale(1.2);
+    }
 
-        .umbrella {
-            position: absolute;
-            width: 60px;
-            height: 60px;
-            cursor: move;
-            user-select: none;
-            z-index: 10;
-        }
+    .date-label {
+      position: absolute;
+      bottom: 5px;
+      font-size: 10px;
+      width: 100%;
+      text-align: center;
+      pointer-events: none;
+    }
 
-        .umbrella-circle {
-            width: 60px;
-            height: 60px;
-            background: #4CAF50;
-            border: 3px solid #2E7D32;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-            font-size: 18px;
-            position: relative;
-            transition: background-color 0.3s ease;
-            clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
-        }
+    #modal-backdrop {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0,0,0,0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 10;
+    }
 
-        .umbrella.open .umbrella-circle {
-            background: #f44336;
-            border-color: #c62828;
-        }
+    #edit-modal {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      min-width: 300px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    }
 
-        .umbrella-pole {
-            position: absolute;
-            width: 2px;
-            height: 20px;
-            background: #8D6E63;
-            left: 50%;
-            top: 100%;
-            transform: translateX(-50%);
-        }
+    #edit-modal label {
+      display: block;
+      margin: 10px 0 5px;
+    }
 
-        .delete-btn {
-            position: absolute;
-            top: -5px;
-            right: -5px;
-            width: 20px;
-            height: 20px;
-            background: #f44336;
-            color: white;
-            border: none;
-            border-radius: 50%;
-            cursor: pointer;
-            font-size: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-            z-index: 20;
-        }
+    #edit-modal input {
+      width: 100%;
+      padding: 6px;
+      font-size: 16px;
+    }
 
-        .umbrella:hover .delete-btn {
-            opacity: 1;
-        }
+    #edit-modal-buttons {
+      margin-top: 15px;
+      text-align: right;
+    }
 
-        .delete-btn:hover {
-            background: #c62828;
-        }
-
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 2000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-        }
-
-        .modal-content {
-            background-color: white;
-            margin: 15% auto;
-            padding: 20px;
-            border-radius: 8px;
-            width: 300px;
-            max-width: 90%;
-        }
-
-        .modal h3 {
-            margin-top: 0;
-            color: #333;
-        }
-
-        .modal label {
-            display: block;
-            margin: 10px 0 5px 0;
-            color: #555;
-        }
-
-        .modal input[type="number"] {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 16px;
-        }
-
-        .modal input[type="checkbox"] {
-            margin-right: 8px;
-        }
-
-        .modal-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-        }
-
-        .modal-btn {
-            flex: 1;
-            padding: 10px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-
-        .save-btn {
-            background: #4CAF50;
-            color: white;
-        }
-
-        .save-btn:hover {
-            background: #45a049;
-        }
-
-        .cancel-btn {
-            background: #757575;
-            color: white;
-        }
-
-        .cancel-btn:hover {
-            background: #616161;
-        }
-
-        .confirm-modal {
-            display: none;
-            position: fixed;
-            z-index: 2000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-        }
-
-        .confirm-content {
-            background-color: white;
-            margin: 20% auto;
-            padding: 20px;
-            border-radius: 8px;
-            width: 300px;
-            max-width: 90%;
-            text-align: center;
-        }
-
-        .dragging {
-            opacity: 0.7;
-            z-index: 1000;
-        }
-    </style>
+    #edit-modal-buttons button {
+      margin-left: 10px;
+      padding: 6px 12px;
+      font-size: 14px;
+    }
+  </style>
 </head>
 <body>
-    <div class="controls">
-        <div class="zoom-controls">
-            <button class="zoom-btn" id="zoomIn">+</button>
-            <span id="zoom-level">100%</span>
-            <button class="zoom-btn" id="zoomOut">-</button>
-        </div>
-        <button class="clear-btn" id="clearAll">Cancella Tutto</button>
+  <div id="map"></div>
+
+  <!-- Modal -->
+  <div id="modal-backdrop">
+    <div id="edit-modal">
+      <h3>Modifica Ombrellone</h3>
+      <label for="lettini-input">Numero lettini:</label>
+      <input type="number" id="lettini-input" min="0">
+      <label><input type="checkbox" id="open-checkbox"> Ombrellone aperto</label>
+      <div id="edit-modal-buttons">
+        <button id="cancel-btn">Annulla</button>
+        <button id="save-btn">Salva</button>
+      </div>
     </div>
+  </div>
 
-    <div class="beach-container" id="beachContainer">
-    </div>
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
+    import { getDatabase, ref, onValue, set, remove } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-database.js";
 
-    <!-- Modal per la modifica dell'ombrellone -->
-    <div id="umbrellaModal" class="modal">
-        <div class="modal-content">
-            <h3>Modifica Ombrellone</h3>
-            <label for="bedCount">Numero lettini:</label>
-            <input type="number" id="bedCount" min="1" max="10" value="2">
-            
-            <label>
-                <input type="checkbox" id="isOpen"> Aperto
-            </label>
-            
-            <label>
-                <input type="checkbox" id="deleteUmbrella"> Elimina ombrellone
-            </label>
-            
-            <div class="modal-buttons">
-                <button class="modal-btn save-btn" id="saveUmbrella">Salva</button>
-                <button class="modal-btn cancel-btn" id="cancelEdit">Annulla</button>
-            </div>
-        </div>
-    </div>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAxqgScWEda7AoGWxWkFBCgVFjDvMks5SU",
+      authDomain: "ombrelloni-ee9aa.firebaseapp.com",
+      databaseURL: "https://ombrelloni-ee9aa-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "ombrelloni-ee9aa",
+      storageBucket: "ombrelloni-ee9aa.appspot.com",
+      messagingSenderId: "781899782985",
+      appId: "1:781899782985:web:a0c2039509531c1c9c1898"
+    };
 
-    <!-- Modal di conferma eliminazione -->
-    <div id="confirmModal" class="confirm-modal">
-        <div class="confirm-content">
-            <h3>Conferma eliminazione</h3>
-            <p>Sei sicuro di voler eliminare questo ombrellone?</p>
-            <div class="modal-buttons">
-                <button class="modal-btn save-btn" id="confirmDelete">Sì</button>
-                <button class="modal-btn cancel-btn" id="cancelDelete">No</button>
-            </div>
-        </div>
-    </div>
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
 
-    <script>
-        // Variabili globali
-        let umbrellaCounter = 0;
-        let currentZoom = 1;
-        let currentUmbrella = null;
-        let umbrellaToDelete = null;
-        let isDragging = false;
-        let dragOffset = { x: 0, y: 0 };
+    const map = document.getElementById('map');
+    const modalBackdrop = document.getElementById('modal-backdrop');
+    const lettiniInput = document.getElementById('lettini-input');
+    const openCheckbox = document.getElementById('open-checkbox');
+    const cancelBtn = document.getElementById('cancel-btn');
+    const saveBtn = document.getElementById('save-btn');
 
-        // Elementi DOM
-        const beachContainer = document.getElementById('beachContainer');
-        const umbrellaModal = document.getElementById('umbrellaModal');
-        const confirmModal = document.getElementById('confirmModal');
-        const zoomLevel = document.getElementById('zoom-level');
+    let currentEl = null;
+    let umbrellas = [];
 
-        // Inizializzazione
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('App inizializzata');
-            initializeEventListeners();
-            loadSavedData();
-        });
-
-        function initializeEventListeners() {
-            // Zoom controls
-            document.getElementById('zoomIn').addEventListener('click', zoomIn);
-            document.getElementById('zoomOut').addEventListener('click', zoomOut);
-            document.getElementById('clearAll').addEventListener('click', clearAllUmbrellas);
-
-            // Modal controls
-            document.getElementById('saveUmbrella').addEventListener('click', saveUmbrellaChanges);
-            document.getElementById('cancelEdit').addEventListener('click', closeModal);
-            document.getElementById('confirmDelete').addEventListener('click', confirmDeleteUmbrella);
-            document.getElementById('cancelDelete').addEventListener('click', cancelDeleteUmbrella);
-
-            // Beach container events
-            beachContainer.addEventListener('click', handleContainerClick);
-            beachContainer.addEventListener('touchstart', handleContainerTouch, { passive: false });
-
-            // Global drag events
-            document.addEventListener('mousemove', handleMouseMove);
-            document.addEventListener('mouseup', handleMouseUp);
-            document.addEventListener('touchmove', handleTouchMove, { passive: false });
-            document.addEventListener('touchend', handleTouchEnd);
-
-            // Close modals when clicking outside
-            window.addEventListener('click', function(event) {
-                if (event.target === umbrellaModal) {
-                    closeModal();
-                }
-                if (event.target === confirmModal) {
-                    cancelDeleteUmbrella();
-                }
-            });
+    function load() {
+      onValue(ref(db, 'umbrellas'), snapshot => {
+        const data = snapshot.val() || {};
+        umbrellas = [];
+        map.innerHTML = '';
+        for (const id in data) {
+          umbrellas.push(data[id]);
+          createUmbrella(data[id]);
         }
+      });
+    }
 
-        // Gestione click sul container
-        function handleContainerClick(event) {
-            if (isDragging) return;
-            if (event.target !== beachContainer) return;
+    function saveUmbrella(data) {
+      set(ref(db, `umbrellas/${data.id}`), data);
+    }
 
-            const rect = beachContainer.getBoundingClientRect();
-            const x = (event.clientX - rect.left) / currentZoom;
-            const y = (event.clientY - rect.top) / currentZoom;
+    function deleteUmbrella(id) {
+      remove(ref(db, `umbrellas/${id}`));
+    }
 
-            createUmbrella(x, y);
+    function createUmbrella(data) {
+      const el = document.createElement('div');
+      el.className = 'umbrella';
+      el.dataset.id = data.id;
+      el.dataset.lettini = data.lettini;
+      el.dataset.open = data.open;
+      el.dataset.mtime = data.mtime;
+      el.style.left = data.x + 'px';
+      el.style.top = data.y + 'px';
+      map.appendChild(el);
+      render(el);
+    }
+
+    function render(el) {
+      const lettini = el.dataset.lettini;
+      const open = el.dataset.open === 'true';
+      const date = new Date(parseInt(el.dataset.mtime || Date.now()));
+      el.classList.toggle('open', open);
+      el.classList.toggle('closed', !open);
+      el.innerHTML = '';
+
+      const deleteBtn = document.createElement('div');
+      deleteBtn.className = 'delete-btn';
+      deleteBtn.title = 'Elimina';
+      deleteBtn.textContent = '🗑️';
+
+      const dateLabel = document.createElement('div');
+      dateLabel.className = 'date-label';
+      dateLabel.textContent = date.toLocaleString();
+
+      el.appendChild(deleteBtn);
+      el.appendChild(dateLabel);
+      el.appendChild(document.createTextNode(lettini));
+      addListeners(el);
+    }
+
+    function addListeners(el) {
+      const deleteBtn = el.querySelector('.delete-btn');
+      
+      // Gestore separato per il pulsante di eliminazione
+      deleteBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        e.preventDefault();
+        if (confirm('Sei sicuro di voler eliminare questo ombrellone?')) {
+          deleteUmbrella(el.dataset.id);
         }
+      });
 
-        // Gestione touch sul container
-        function handleContainerTouch(event) {
-            if (event.touches.length === 1 && event.target === beachContainer && !isDragging) {
-                const touch = event.touches[0];
-                const rect = beachContainer.getBoundingClientRect();
-                const x = (touch.clientX - rect.left) / currentZoom;
-                const y = (touch.clientY - rect.top) / currentZoom;
+      // Previeni il drag quando si clicca sul pulsante delete
+      deleteBtn.addEventListener('pointerdown', e => {
+        e.stopPropagation();
+      });
 
-                createUmbrella(x, y);
-                event.preventDefault();
-            }
-        }
+      el.onclick = e => {
+        if (e.target.closest('.delete-btn')) return;
+        if (el.classList.contains('dragging')) return; // Evita apertura modal durante drag
+        currentEl = el;
+        lettiniInput.value = el.dataset.lettini;
+        openCheckbox.checked = el.dataset.open === 'true';
+        modalBackdrop.style.display = 'flex';
+      };
 
-        // Creazione ombrellone
-        function createUmbrella(x, y) {
-            const umbrella = document.createElement('div');
-            umbrella.className = 'umbrella';
-            umbrella.style.left = (x - 30) + 'px';
-            umbrella.style.top = (y - 30) + 'px';
-            umbrella.id = 'umbrella-' + (++umbrellaCounter);
+      let isDragging = false;
+      let dragThreshold = 5; // pixels minimi per considerare un drag
+      let startX, startY;
 
-            umbrella.innerHTML = `
-                <div class="umbrella-circle">2</div>
-                <div class="umbrella-pole"></div>
-                <button class="delete-btn">🗑️</button>
-            `;
+      el.onpointerdown = e => {
+        // Non iniziare il drag se si clicca sul pulsante delete
+        if (e.target.closest('.delete-btn')) return;
+        
+        e.preventDefault();
+        startX = e.clientX;
+        startY = e.clientY;
+        const origX = parseInt(el.style.left);
+        const origY = parseInt(el.style.top);
+        el.setPointerCapture(e.pointerId);
+        isDragging = false;
 
-            setupUmbrellaEvents(umbrella);
-            beachContainer.appendChild(umbrella);
-            saveData();
-
-            console.log('Ombrellone creato:', umbrella.id);
-        }
-
-        // Setup eventi per un ombrellone
-        function setupUmbrellaEvents(umbrella) {
-            const deleteBtn = umbrella.querySelector('.delete-btn');
-
-            // Click per modificare
-            umbrella.addEventListener('click', function(event) {
-                if (isDragging) return;
-                if (event.target === deleteBtn) return;
-                event.stopPropagation();
-                editUmbrella(umbrella);
-            });
-
-            // Delete button
-            deleteBtn.addEventListener('click', function(event) {
-                event.stopPropagation();
-                deleteUmbrella(umbrella);
-            });
-
-            // Mouse drag
-            umbrella.addEventListener('mousedown', function(event) {
-                if (event.target === deleteBtn) return;
-                startDrag(event, umbrella);
-            });
-
-            // Touch drag
-            umbrella.addEventListener('touchstart', function(event) {
-                if (event.target === deleteBtn) return;
-                startDrag(event, umbrella);
-            }, { passive: false });
-        }
-
-        // Inizio drag
-        function startDrag(event, umbrella) {
+        const move = ev => {
+          const dx = ev.clientX - startX;
+          const dy = ev.clientY - startY;
+          
+          // Inizia il drag solo se si supera la soglia
+          if (!isDragging && (Math.abs(dx) > dragThreshold || Math.abs(dy) > dragThreshold)) {
             isDragging = true;
-            umbrella.classList.add('dragging');
+            el.classList.add('dragging');
+          }
 
-            const rect = umbrella.getBoundingClientRect();
-            const containerRect = beachContainer.getBoundingClientRect();
+          if (isDragging) {
+            el.style.left = origX + dx + 'px';
+            el.style.top = origY + dy + 'px';
+          }
+        };
 
-            let clientX, clientY;
-            if (event.type === 'touchstart') {
-                clientX = event.touches[0].clientX;
-                clientY = event.touches[0].clientY;
-            } else {
-                clientX = event.clientX;
-                clientY = event.clientY;
-            }
-
-            dragOffset.x = clientX - rect.left;
-            dragOffset.y = clientY - rect.top;
-
-            currentUmbrella = umbrella;
-            event.preventDefault();
-        }
-
-        // Movimento durante drag
-        function handleMouseMove(event) {
-            if (!isDragging || !currentUmbrella) return;
-            updateDragPosition(event.clientX, event.clientY);
-        }
-
-        function handleTouchMove(event) {
-            if (!isDragging || !currentUmbrella) return;
-            if (event.touches.length === 1) {
-                updateDragPosition(event.touches[0].clientX, event.touches[0].clientY);
-                event.preventDefault();
-            }
-        }
-
-        function updateDragPosition(clientX, clientY) {
-            const containerRect = beachContainer.getBoundingClientRect();
-            const x = (clientX - containerRect.left - dragOffset.x) / currentZoom;
-            const y = (clientY - containerRect.top - dragOffset.y) / currentZoom;
-
-            currentUmbrella.style.left = x + 'px';
-            currentUmbrella.style.top = y + 'px';
-        }
-
-        // Fine drag
-        function handleMouseUp(event) {
-            endDrag();
-        }
-
-        function handleTouchEnd(event) {
-            endDrag();
-        }
-
-        function endDrag() {
-            if (isDragging && currentUmbrella) {
-                currentUmbrella.classList.remove('dragging');
-                saveData();
-            }
+        const up = () => {
+          el.releasePointerCapture(e.pointerId);
+          el.removeEventListener('pointermove', move);
+          el.removeEventListener('pointerup', up);
+          
+          if (isDragging) {
+            el.classList.remove('dragging');
+            el.dataset.mtime = Date.now();
+            updateData(el, true);
+            render(el);
+            const idx = umbrellas.findIndex(u => u.id == el.dataset.id);
+            if (idx !== -1) saveUmbrella(umbrellas[idx]);
+          }
+          
+          // Reset del flag di dragging dopo un breve delay
+          setTimeout(() => {
             isDragging = false;
-            currentUmbrella = null;
-        }
+          }, 100);
+        };
+        
+        el.addEventListener('pointermove', move);
+        el.addEventListener('pointerup', up);
+      };
+    }
 
-        // Modifica ombrellone
-        function editUmbrella(umbrella) {
-            currentUmbrella = umbrella;
-            const circle = umbrella.querySelector('.umbrella-circle');
-            const bedCount = parseInt(circle.textContent);
-            const isOpen = umbrella.classList.contains('open');
+    function updateData(el, posOnly = false) {
+      const idx = umbrellas.findIndex(u => u.id == el.dataset.id);
+      if (idx === -1) return;
+      umbrellas[idx].x = parseInt(el.style.left);
+      umbrellas[idx].y = parseInt(el.style.top);
+      umbrellas[idx].mtime = parseInt(el.dataset.mtime);
+      if (!posOnly) {
+        umbrellas[idx].lettini = el.dataset.lettini;
+        umbrellas[idx].open = el.dataset.open === 'true';
+      }
+    }
 
-            document.getElementById('bedCount').value = bedCount;
-            document.getElementById('isOpen').checked = isOpen;
-            document.getElementById('deleteUmbrella').checked = false;
-            umbrellaModal.style.display = 'block';
-        }
+    // ✅ MODIFICATO QUI: compatibilità con WebView AppInventor
+    map.addEventListener('click', e => {
+      if (e.target !== map) return;
 
-        // Salva modifiche ombrellone
-        function saveUmbrellaChanges() {
-            if (!currentUmbrella) return;
+      const rect = map.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
 
-            const deleteChecked = document.getElementById('deleteUmbrella').checked;
-            if (deleteChecked) {
-                currentUmbrella.remove();
-                closeModal();
-                saveData();
-                return;
-            }
+      const id = Date.now();
+      const data = {
+        id,
+        lettini: '2',
+        open: false,
+        x: x - 70,
+        y: y - 70,
+        mtime: Date.now()
+      };
 
-            const bedCount = document.getElementById('bedCount').value;
-            const isOpen = document.getElementById('isOpen').checked;
+      umbrellas.push(data);
+      createUmbrella(data);
+      saveUmbrella(data);
+    });
 
-            const circle = currentUmbrella.querySelector('.umbrella-circle');
-            circle.textContent = bedCount;
+    cancelBtn.onclick = () => {
+      modalBackdrop.style.display = 'none';
+      currentEl = null;
+    };
 
-            if (isOpen) {
-                currentUmbrella.classList.add('open');
-            } else {
-                currentUmbrella.classList.remove('open');
-            }
+    saveBtn.onclick = () => {
+      if (!currentEl) return;
+      currentEl.dataset.lettini = lettiniInput.value || '2';
+      currentEl.dataset.open = openCheckbox.checked;
+      currentEl.dataset.mtime = Date.now();
+      updateData(currentEl);
+      render(currentEl);
+      const idx = umbrellas.findIndex(u => u.id == currentEl.dataset.id);
+      if (idx !== -1) saveUmbrella(umbrellas[idx]);
+      modalBackdrop.style.display = 'none';
+      currentEl = null;
+    };
 
-            closeModal();
-            saveData();
-        }
-
-        // Chiudi modal
-        function closeModal() {
-            umbrellaModal.style.display = 'none';
-            currentUmbrella = null;
-        }
-
-        // Elimina ombrellone
-        function deleteUmbrella(umbrella) {
-            umbrellaToDelete = umbrella;
-            confirmModal.style.display = 'block';
-        }
-
-        function confirmDeleteUmbrella() {
-            if (umbrellaToDelete) {
-                umbrellaToDelete.remove();
-                umbrellaToDelete = null;
-                saveData();
-            }
-            confirmModal.style.display = 'none';
-        }
-
-        function cancelDeleteUmbrella() {
-            umbrellaToDelete = null;
-            confirmModal.style.display = 'none';
-        }
-
-        // Zoom functions
-        function zoomIn() {
-            currentZoom = Math.min(currentZoom * 1.2, 3);
-            updateZoom();
-        }
-
-        function zoomOut() {
-            currentZoom = Math.max(currentZoom / 1.2, 0.3);
-            updateZoom();
-        }
-
-        function updateZoom() {
-            beachContainer.style.transform = `scale(${currentZoom})`;
-            zoomLevel.textContent = Math.round(currentZoom * 100) + '%';
-            saveData();
-        }
-
-        // Cancella tutto
-        function clearAllUmbrellas() {
-            if (confirm('Sei sicuro di voler cancellare tutti gli ombrelloni?')) {
-                beachContainer.querySelectorAll('.umbrella').forEach(umbrella => {
-                    umbrella.remove();
-                });
-                umbrellaCounter = 0;
-                saveData();
-            }
-        }
-
-        // Salvataggio e caricamento dati
-        function saveData() {
-            try {
-                const umbrellas = [];
-                beachContainer.querySelectorAll('.umbrella').forEach(umbrella => {
-                    const circle = umbrella.querySelector('.umbrella-circle');
-                    umbrellas.push({
-                        id: umbrella.id,
-                        x: parseInt(umbrella.style.left) || 0,
-                        y: parseInt(umbrella.style.top) || 0,
-                        bedCount: parseInt(circle.textContent),
-                        isOpen: umbrella.classList.contains('open')
-                    });
-                });
-
-                const data = {
-                    counter: umbrellaCounter,
-                    zoom: currentZoom,
-                    umbrellas: umbrellas
-                };
-
-                localStorage.setItem('beachUmbrellas', JSON.stringify(data));
-                console.log('Dati salvati:', data);
-            } catch (e) {
-                console.error('Errore nel salvataggio:', e);
-            }
-        }
-
-        function loadSavedData() {
-            try {
-                const savedData = localStorage.getItem('beachUmbrellas');
-                if (savedData) {
-                    const data = JSON.parse(savedData);
-                    umbrellaCounter = data.counter || 0;
-                    currentZoom = data.zoom || 1;
-                    updateZoom();
-
-                    if (data.umbrellas) {
-                        data.umbrellas.forEach(umbrellaInfo => {
-                            loadUmbrella(umbrellaInfo);
-                        });
-                    }
-                    console.log('Dati caricati:', data);
-                }
-            } catch (e) {
-                console.error('Errore nel caricamento:', e);
-            }
-        }
-
-        function loadUmbrella(umbrellaInfo) {
-            const umbrella = document.createElement('div');
-            umbrella.className = 'umbrella';
-            if (umbrellaInfo.isOpen) {
-                umbrella.classList.add('open');
-            }
-            umbrella.style.left = umbrellaInfo.x + 'px';
-            umbrella.style.top = umbrellaInfo.y + 'px';
-            umbrella.id = umbrellaInfo.id;
-
-            umbrella.innerHTML = `
-                <div class="umbrella-circle">${umbrellaInfo.bedCount}</div>
-                <div class="umbrella-pole"></div>
-                <button class="delete-btn">🗑️</button>
-            `;
-
-            setupUmbrellaEvents(umbrella);
-            beachContainer.appendChild(umbrella);
-        }
-    </script>
+    load();
+  </script>
 </body>
+</html>
