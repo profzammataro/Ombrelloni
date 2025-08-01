@@ -7,21 +7,21 @@
     body {
       margin: 0;
       font-family: sans-serif;
-      background-image: url('sfondo.jpg');
-background-size: cover;
-  background-repeat: no-repeat;
-  background-position: center center;
-  height: 100vh;
-  margin: 0;
-');
+      
     }
 
     #map {
-      width: 100vw;
-      height: 100vh;
-      position: relative;
-      cursor: crosshair;
-    }
+  width: 100vw;
+  height: 100dvh; /* o 100vh se preferisci, ma 100dvh è più preciso su iOS */
+  position: relative;
+  cursor: crosshair;
+
+  background-image: url('sfondo.jpg');
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center center;
+}
+
 
     .umbrella {
       width: 140px;
