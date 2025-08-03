@@ -253,14 +253,14 @@
       const vh = window.innerHeight * 0.01;
       document.documentElement.style.setProperty('--vh', `${vh}px`);
       
-      // Aggiorna anche l'immagine di sfondo se necessario
+      // Aggiorna l'altezza degli elementi per mantenere le proporzioni
       if (window.visualViewport) {
-        const bgImage = document.getElementById('background-image');
         const bgContainer = document.querySelector('.background-container');
-        const map = document.getElementById('map');
+        const mapElement = document.getElementById('map');
+        const actualHeight = window.visualViewport.height;
         
-        bgContainer.style.height = `${window.visualViewport.height}px`;
-        map.style.height = `${window.visualViewport.height}px`;
+        bgContainer.style.height = `${actualHeight}px`;
+        mapElement.style.height = `${actualHeight}px`;
       }
     }
 
@@ -302,8 +302,13 @@
       el.dataset.lettini = data.lettini;
       el.dataset.open = data.open;
       el.dataset.mtime = data.mtime;
-      el.style.left = data.x + 'px';
-      el.style.top = data.y + 'px';
+      
+      // Assicurati che le coordinate siano valide
+      const x = parseInt(data.x) || 0;
+      const y = parseInt(data.y) || 0;
+      
+      el.style.left = x + 'px';
+      el.style.top = y + 'px';
       map.appendChild(el);
       render(el);
     }
@@ -421,8 +426,12 @@
           }
 
           if (isDragging) {
-            el.style.left = origX + dx + 'px';
-            el.style.top = origY + dy + 'px';
+            // Calcola le nuove posizioni mantenendo i limiti della mappa
+            const newX = Math.max(0, Math.min(map.clientWidth - 140, origX + dx));
+            const newY = Math.max(0, Math.min(map.clientHeight - 140, origY + dy));
+            
+            el.style.left = newX + 'px';
+            el.style.top = newY + 'px';
           }
         };
 
@@ -467,6 +476,7 @@
     map.addEventListener('click', e => {
       if (e.target !== map) return;
 
+      // Calcola le coordinate corrette rispetto alla mappa
       const rect = map.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
@@ -476,7 +486,7 @@
         id,
         lettini: '2',
         open: false,
-        x: x - 70,
+        x: x - 70, // Centrato sull'ombrellone (140px/2 = 70px)
         y: y - 70,
         mtime: Date.now()
       };
