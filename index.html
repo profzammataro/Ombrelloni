@@ -2,81 +2,27 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Gestione Ombrelloni Online</title>
   <style>
-    /* Fix globale per iOS e Android */
-    * {
-      box-sizing: border-box;
-    }
-
-    html {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      width: 100%;
-    }
-
     body {
       margin: 0;
-      padding: 0;
       font-family: sans-serif;
-      height: 100vh;
-      height: -webkit-fill-available; /* Fix iOS */
-      width: 100%;
-      overflow: hidden;
-      position: fixed; /* Previene scroll su iOS */
+      
     }
 
-    /* Contenitore per l'immagine di sfondo */
-    .background-container {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      height: -webkit-fill-available; /* Fix iOS */
-      z-index: -1;
-    }
-
-    /* Immagine di sfondo responsive */
-    #background-image {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      object-position: center center;
-      display: block;
-    }
-
-    /* Mappa per gli ombrelloni */
     #map {
-      width: 100vw;
-      height: 100vh;
-      height: -webkit-fill-available; /* Fix iOS */
-      position: absolute;
-      top: 0;
-      left: 0;
-      cursor: crosshair;
-      z-index: 1;
-    }
+  width: 100vw;
+  height: 100dvh; /* o 100vh se preferisci, ma 100dvh è più preciso su iOS */
+  position: absolute;
+  cursor: crosshair;
+ background-image:   url('sfondo.jpg');
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center center;
 
-    /* Fix specifico iOS Safari */
-    @supports (-webkit-touch-callout: none) {
-      body {
-        height: -webkit-fill-available;
-        min-height: -webkit-fill-available;
-      }
-      
-      #map {
-        height: -webkit-fill-available;
-        min-height: -webkit-fill-available;
-      }
-      
-      .background-container {
-        height: -webkit-fill-available;
-        min-height: -webkit-fill-available;
-      }
-    }
+  
+}
+
 
     .umbrella {
       width: 140px;
@@ -157,9 +103,8 @@
       top: 0; left: 0;
       width: 100vw;
       height: 100vh;
-      height: -webkit-fill-available; /* Fix iOS */
       background: rgba(0,0,0,0.5);
-      z-index: 1000;
+      z-index: 10;
     }
 
     #edit-modal {
@@ -168,7 +113,6 @@
       padding: 20px;
       border-radius: 8px;
       min-width: 300px;
-      max-width: 90vw;
       box-shadow: 0 0 10px rgba(0,0,0,0.5);
       transform: translate(-50%, -50%);
     }
@@ -197,12 +141,6 @@
   </style>
 </head>
 <body>
-  <!-- Contenitore per l'immagine di sfondo -->
-  <div class="background-container">
-    <img id="background-image" src="sfondo.jpg" alt="Sfondo spiaggia">
-  </div>
-
-  <!-- Mappa per gli ombrelloni -->
   <div id="map"></div>
 
   <!-- Modal -->
@@ -248,33 +186,6 @@
     let currentEl = null;
     let umbrellas = [];
 
-    // Fix per iOS - aggiorna l'altezza in base alla viewport
-    function updateViewportHeight() {
-      const vh = window.innerHeight * 0.01;
-      document.documentElement.style.setProperty('--vh', `${vh}px`);
-      
-      // Aggiorna l'altezza degli elementi per mantenere le proporzioni
-      if (window.visualViewport) {
-        const bgContainer = document.querySelector('.background-container');
-        const mapElement = document.getElementById('map');
-        const actualHeight = window.visualViewport.height;
-        
-        bgContainer.style.height = `${actualHeight}px`;
-        mapElement.style.height = `${actualHeight}px`;
-      }
-    }
-
-    // Chiama la funzione al caricamento e sui cambi di orientamento
-    updateViewportHeight();
-    window.addEventListener('resize', updateViewportHeight);
-    window.addEventListener('orientationchange', () => {
-      setTimeout(updateViewportHeight, 100);
-    });
-
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', updateViewportHeight);
-    }
-
     function load() {
       onValue(ref(db, 'umbrellas'), snapshot => {
         const data = snapshot.val() || {};
@@ -302,13 +213,8 @@
       el.dataset.lettini = data.lettini;
       el.dataset.open = data.open;
       el.dataset.mtime = data.mtime;
-      
-      // Assicurati che le coordinate siano valide
-      const x = parseInt(data.x) || 0;
-      const y = parseInt(data.y) || 0;
-      
-      el.style.left = x + 'px';
-      el.style.top = y + 'px';
+      el.style.left = data.x + 'px';
+      el.style.top = data.y + 'px';
       map.appendChild(el);
       render(el);
     }
@@ -426,12 +332,8 @@
           }
 
           if (isDragging) {
-            // Calcola le nuove posizioni mantenendo i limiti della mappa
-            const newX = Math.max(0, Math.min(map.clientWidth - 140, origX + dx));
-            const newY = Math.max(0, Math.min(map.clientHeight - 140, origY + dy));
-            
-            el.style.left = newX + 'px';
-            el.style.top = newY + 'px';
+            el.style.left = origX + dx + 'px';
+            el.style.top = origY + dy + 'px';
           }
         };
 
@@ -472,11 +374,10 @@
       }
     }
 
-    // Compatibilità con WebView AppInventor
+    // ✅ MODIFICATO QUI: compatibilità con WebView AppInventor
     map.addEventListener('click', e => {
       if (e.target !== map) return;
 
-      // Calcola le coordinate corrette rispetto alla mappa
       const rect = map.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
@@ -486,7 +387,7 @@
         id,
         lettini: '2',
         open: false,
-        x: x - 70, // Centrato sull'ombrellone (140px/2 = 70px)
+        x: x - 70,
         y: y - 70,
         mtime: Date.now()
       };
