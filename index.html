@@ -11,17 +11,17 @@
       -webkit-touch-callout: none;
       -webkit-user-select: none;
       -webkit-tap-highlight-color: transparent;
+      box-sizing: border-box;
     }
 
     body {
       margin: 0;
       padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
       overflow: hidden;
       position: fixed;
       width: 100%;
       height: 100%;
-      -webkit-overflow-scrolling: touch;
     }
 
     #map {
@@ -40,21 +40,19 @@
     }
 
     .umbrella {
-      width: 140px;
-      height: 140px;
+      width: 120px;
+      height: 120px;
       position: absolute;
       display: flex;
       justify-content: center;
       align-items: center;
-      font-size: 40px;
+      font-size: 32px;
       font-weight: bold;
       color: #000;
-      box-sizing: border-box;
-      cursor: grab;
       border: 2px solid #333;
       background-color: gray;
       text-align: center;
-      padding: 10px;
+      padding: 8px;
       clip-path: polygon(30% 0%, 70% 0%, 100% 50%, 70% 100%, 30% 100%, 0% 50%);
       transition: transform 0.2s ease, box-shadow 0.2s ease;
       user-select: none;
@@ -63,64 +61,72 @@
       -webkit-touch-callout: none;
       -webkit-tap-highlight-color: transparent;
       transform-origin: center center;
+      cursor: pointer;
     }
 
+    .umbrella:hover,
     .umbrella:active {
       transform: scale(1.05);
       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
 
     .umbrella.dragging {
-      cursor: grabbing;
       transform: scale(1.1) rotate(2deg);
       box-shadow: 0 8px 20px rgba(0,0,0,0.4);
       z-index: 1000;
       transition: none;
+      cursor: grabbing;
     }
 
     .umbrella.open {
-      background-color: green;
+      background-color: #4CAF50;
     }
 
     .umbrella.closed {
-      background-color: red;
+      background-color: #f44336;
     }
 
     .delete-btn {
       position: absolute;
-      top: 10px;
-      right: 15px;
+      top: 8px;
+      right: 8px;
       cursor: pointer;
-      font-size: 18px;
-      color: black;
+      font-size: 16px;
+      color: #333;
       user-select: none;
-      z-index: 1;
-      padding: 6px;
+      z-index: 2;
+      padding: 4px;
       border-radius: 50%;
-      background: rgba(255, 255, 255, 0.8);
-      transition: background-color 0.2s ease, transform 0.2s ease;
+      background: rgba(255, 255, 255, 0.9);
+      transition: all 0.2s ease;
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
-      min-width: 30px;
-      min-height: 30px;
+      min-width: 24px;
+      min-height: 24px;
       display: flex;
       align-items: center;
       justify-content: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
     }
 
+    .delete-btn:hover,
     .delete-btn:active {
-      background: rgba(255, 0, 0, 0.3);
-      transform: scale(1.2);
+      background: rgba(255, 0, 0, 0.1);
+      transform: scale(1.1);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
 
     .date-label {
       position: absolute;
-      bottom: 5px;
-      font-size: 10px;
+      bottom: 2px;
+      font-size: 8px;
       width: 100%;
       text-align: center;
       pointer-events: none;
-      line-height: 1.2;
+      line-height: 1;
+      background: rgba(255,255,255,0.7);
+      padding: 1px;
+      border-radius: 2px;
     }
 
     #modal-backdrop {
@@ -130,77 +136,116 @@
       left: 0;
       width: 100vw;
       height: 100vh;
-      background: rgba(0,0,0,0.5);
+      background: rgba(0,0,0,0.6);
       z-index: 1000;
-      -webkit-backdrop-filter: blur(5px);
-      backdrop-filter: blur(5px);
+      backdrop-filter: blur(3px);
+      -webkit-backdrop-filter: blur(3px);
     }
 
     #edit-modal {
       position: absolute;
       background: white;
-      padding: 20px;
-      border-radius: 12px;
-      min-width: 280px;
+      padding: 24px;
+      border-radius: 16px;
+      min-width: 300px;
       max-width: 90vw;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
       transform: translate(-50%, -50%);
       -webkit-transform: translate(-50%, -50%);
     }
 
     #edit-modal h3 {
-      margin-top: 0;
-      margin-bottom: 20px;
-      font-size: 18px;
+      margin: 0 0 20px 0;
+      font-size: 20px;
       text-align: center;
+      color: #333;
+    }
+
+    .modal-field {
+      margin-bottom: 20px;
     }
 
     #edit-modal label {
       display: block;
-      margin: 15px 0 8px;
-      font-weight: 500;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #555;
+      font-size: 14px;
     }
 
-    #edit-modal input[type="number"] {
+    .select-wrapper {
+      position: relative;
+      display: inline-block;
       width: 100%;
-      padding: 12px;
-      font-size: 16px;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      box-sizing: border-box;
-      -webkit-appearance: none;
-      appearance: none;
     }
 
-    #edit-modal input[type="checkbox"] {
-      margin-right: 8px;
-      transform: scale(1.2);
-      -webkit-transform: scale(1.2);
+    #lettini-select {
+      width: 100%;
+      padding: 12px 16px;
+      font-size: 16px;
+      border: 2px solid #ddd;
+      border-radius: 10px;
+      background: white;
+      color: #333;
+      cursor: pointer;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+      background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 5"><path fill="%23666" d="M2 0L0 2h4zm0 5L0 3h4z"/></svg>');
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      background-size: 12px;
+    }
+
+    #lettini-select:focus {
+      outline: none;
+      border-color: #007AFF;
+      box-shadow: 0 0 0 3px rgba(0,122,255,0.1);
+    }
+
+    .checkbox-wrapper {
+      display: flex;
+      align-items: center;
+      padding: 8px 0;
+    }
+
+    .checkbox-wrapper input[type="checkbox"] {
+      margin-right: 12px;
+      transform: scale(1.3);
+      -webkit-transform: scale(1.3);
+      cursor: pointer;
+    }
+
+    .checkbox-wrapper label {
+      margin: 0;
+      cursor: pointer;
+      font-size: 16px;
     }
 
     #edit-modal-buttons {
-      margin-top: 25px;
-      text-align: center;
+      margin-top: 24px;
       display: flex;
-      gap: 10px;
+      gap: 12px;
       justify-content: center;
     }
 
     #edit-modal-buttons button {
       flex: 1;
-      padding: 12px 20px;
+      padding: 14px 24px;
       font-size: 16px;
-      border-radius: 8px;
+      font-weight: 600;
+      border-radius: 10px;
       border: none;
-      font-weight: 500;
       cursor: pointer;
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
+      transition: all 0.2s ease;
     }
 
     #cancel-btn {
-      background-color: #f5f5f5;
-      color: #333;
+      background-color: #f8f9fa;
+      color: #6c757d;
+      border: 1px solid #dee2e6;
     }
 
     #save-btn {
@@ -208,15 +253,19 @@
       color: white;
     }
 
+    #cancel-btn:hover,
     #cancel-btn:active {
-      background-color: #e0e0e0;
+      background-color: #e9ecef;
+      border-color: #adb5bd;
     }
 
+    #save-btn:hover,
     #save-btn:active {
-      background-color: #0051D5;
+      background-color: #0056b3;
+      transform: translateY(-1px);
     }
 
-    /* Stili specifici per iPhone */
+    /* Stili specifici per dispositivi iOS */
     @supports (-webkit-touch-callout: none) {
       body {
         padding-top: env(safe-area-inset-top);
@@ -226,7 +275,27 @@
       }
     }
 
-    /* Prevenire zoom accidentale su double-tap */
+    /* Responsive adjustments */
+    @media (max-width: 480px) {
+      .umbrella {
+        width: 100px;
+        height: 100px;
+        font-size: 28px;
+      }
+      
+      #edit-modal {
+        min-width: 280px;
+        padding: 20px;
+      }
+      
+      .delete-btn {
+        min-width: 20px;
+        min-height: 20px;
+        font-size: 14px;
+      }
+    }
+
+    /* Prevenire zoom accidentale */
     * {
       touch-action: manipulation;
     }
@@ -239,9 +308,27 @@
   <div id="modal-backdrop">
     <div id="edit-modal">
       <h3>Modifica Ombrellone</h3>
-      <label for="lettini-input">Numero lettini:</label>
-      <input type="number" id="lettini-input" min="0" inputmode="numeric">
-      <label><input type="checkbox" id="open-checkbox"> Ombrellone aperto</label>
+      
+      <div class="modal-field">
+        <label for="lettini-select">Numero lettini:</label>
+        <div class="select-wrapper">
+          <select id="lettini-select">
+            <option value="0">0 lettini</option>
+            <option value="1">1 lettino</option>
+            <option value="2" selected>2 lettini</option>
+            <option value="3">3 lettini</option>
+            <option value="4">4 lettini</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="modal-field">
+        <div class="checkbox-wrapper">
+          <input type="checkbox" id="open-checkbox">
+          <label for="open-checkbox">Ombrellone aperto</label>
+        </div>
+      </div>
+      
       <div id="edit-modal-buttons">
         <button id="cancel-btn">Annulla</button>
         <button id="save-btn">Salva</button>
@@ -270,7 +357,7 @@
     const map = document.getElementById('map');
     const modalBackdrop = document.getElementById('modal-backdrop');
     const editModal = document.getElementById('edit-modal');
-    const lettiniInput = document.getElementById('lettini-input');
+    const lettiniSelect = document.getElementById('lettini-select');
     const openCheckbox = document.getElementById('open-checkbox');
     const cancelBtn = document.getElementById('cancel-btn');
     const saveBtn = document.getElementById('save-btn');
@@ -278,19 +365,26 @@
     let currentEl = null;
     let umbrellas = [];
     let isTouch = 'ontouchstart' in window;
+    let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-    // Prevenire comportamenti di default del browser su iOS
-    document.addEventListener('touchstart', function(e) {
-      if (e.touches.length > 1) {
-        e.preventDefault(); // Previene zoom con pinch
-      }
-    }, { passive: false });
+    // Detect platform for better touch handling
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isAndroid = /Android/.test(navigator.userAgent);
 
-    document.addEventListener('touchmove', function(e) {
-      if (e.touches.length > 1) {
-        e.preventDefault(); // Previene zoom con pinch
-      }
-    }, { passive: false });
+    // Prevenire comportamenti indesiderati solo su iOS
+    if (isIOS) {
+      document.addEventListener('touchstart', function(e) {
+        if (e.touches.length > 1) {
+          e.preventDefault();
+        }
+      }, { passive: false });
+
+      document.addEventListener('touchmove', function(e) {
+        if (e.touches.length > 1) {
+          e.preventDefault();
+        }
+      }, { passive: false });
+    }
 
     function load() {
       onValue(ref(db, 'umbrellas'), snapshot => {
@@ -329,14 +423,16 @@
       const lettini = el.dataset.lettini;
       const open = el.dataset.open === 'true';
       const date = new Date(parseInt(el.dataset.mtime || Date.now()));
+      
       el.classList.toggle('open', open);
       el.classList.toggle('closed', !open);
       el.innerHTML = '';
 
       const deleteBtn = document.createElement('div');
       deleteBtn.className = 'delete-btn';
-      deleteBtn.title = 'Elimina';
-      deleteBtn.textContent = '🗑️';
+      deleteBtn.setAttribute('data-action', 'delete');
+      deleteBtn.title = 'Elimina ombrellone';
+      deleteBtn.innerHTML = '✕';
 
       const dateLabel = document.createElement('div');
       dateLabel.className = 'date-label';
@@ -350,6 +446,7 @@
       el.appendChild(deleteBtn);
       el.appendChild(dateLabel);
       el.appendChild(document.createTextNode(lettini));
+      
       addListeners(el);
     }
 
@@ -359,111 +456,94 @@
       const viewportHeight = window.innerHeight;
       
       // Calcola la posizione del centro dell'ombrellone
-      const umbrellaX = rect.left + rect.width / 2;
-      const umbrellaY = rect.top + rect.height / 2;
+      let centerX = rect.left + rect.width / 2;
+      let centerY = rect.top + rect.height / 2;
       
-      // Posiziona il modal al centro dell'ombrellone
-      editModal.style.left = umbrellaX + 'px';
-      editModal.style.top = umbrellaY + 'px';
-      
-      // Forza il rendering per ottenere le dimensioni corrette
+      // Posiziona temporaneamente il modal per calcolare le sue dimensioni
+      editModal.style.visibility = 'hidden';
       editModal.style.display = 'block';
       const modalRect = editModal.getBoundingClientRect();
       
-      // Aggiusta la posizione se il modal esce dallo schermo
-      let adjustedX = umbrellaX;
-      let adjustedY = umbrellaY;
+      // Aggiusta la posizione per mantenere il modal visibile
+      const margin = 20;
+      const modalHalfWidth = modalRect.width / 2;
+      const modalHalfHeight = modalRect.height / 2;
       
-      if (modalRect.right > viewportWidth) {
-        adjustedX = viewportWidth - modalRect.width / 2 - 20;
-      }
-      if (modalRect.left < 0) {
-        adjustedX = modalRect.width / 2 + 20;
-      }
-      if (modalRect.bottom > viewportHeight) {
-        adjustedY = viewportHeight - modalRect.height / 2 - 20;
-      }
-      if (modalRect.top < 0) {
-        adjustedY = modalRect.height / 2 + 20;
+      if (centerX - modalHalfWidth < margin) {
+        centerX = modalHalfWidth + margin;
+      } else if (centerX + modalHalfWidth > viewportWidth - margin) {
+        centerX = viewportWidth - modalHalfWidth - margin;
       }
       
-      editModal.style.left = adjustedX + 'px';
-      editModal.style.top = adjustedY + 'px';
+      if (centerY - modalHalfHeight < margin) {
+        centerY = modalHalfHeight + margin;
+      } else if (centerY + modalHalfHeight > viewportHeight - margin) {
+        centerY = viewportHeight - modalHalfHeight - margin;
+      }
+      
+      editModal.style.left = centerX + 'px';
+      editModal.style.top = centerY + 'px';
+      editModal.style.visibility = 'visible';
     }
 
     function addListeners(el) {
       const deleteBtn = el.querySelector('.delete-btn');
       
-      // Gestore per eliminazione con touch events migliorato
-      deleteBtn.addEventListener('touchstart', e => {
-        e.stopPropagation();
-        e.preventDefault();
-      }, { passive: false });
-      
-      deleteBtn.addEventListener('touchend', e => {
-        e.stopPropagation();
-        e.preventDefault();
-        if (confirm('Sei sicuro di voler eliminare questo ombrellone?')) {
-          deleteUmbrella(el.dataset.id);
-        }
-      }, { passive: false });
-
-      // Fallback per mouse
-      deleteBtn.addEventListener('click', e => {
-        e.stopPropagation();
-        e.preventDefault();
-        if (!isTouch && confirm('Sei sicuro di voler eliminare questo ombrellone?')) {
-          deleteUmbrella(el.dataset.id);
-        }
-      });
-
       let isDragging = false;
-      let dragThreshold = 10; // Aumentato per iPhone
+      let hasMoved = false;
       let startX, startY, startTime;
-      let longPressTimer;
+      let dragThreshold = isMobile ? 8 : 5;
 
-      // Gestore touch unificato
-      el.addEventListener('touchstart', e => {
-        if (e.target.closest('.delete-btn')) return;
+      // Gestione eventi unificata per touch e mouse
+      function handleStart(e) {
+        // Se è il pulsante delete, gestisci separatamente
+        if (e.target.closest('.delete-btn')) {
+          e.stopPropagation();
+          e.preventDefault();
+          handleDelete();
+          return;
+        }
+
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
         
-        e.preventDefault();
-        const touch = e.touches[0];
-        startX = touch.clientX;
-        startY = touch.clientY;
+        startX = clientX;
+        startY = clientY;
         startTime = Date.now();
+        hasMoved = false;
+        isDragging = false;
         
         const origX = parseInt(el.style.left);
         const origY = parseInt(el.style.top);
-        isDragging = false;
 
-        // Timer per long press (per aprire modal senza drag)
-        longPressTimer = setTimeout(() => {
-          if (!isDragging) {
-            openModal(el);
-          }
-        }, 500);
-
-        const move = ev => {
-          clearTimeout(longPressTimer);
-          const touch = ev.touches[0];
-          const dx = touch.clientX - startX;
-          const dy = touch.clientY - startY;
+        function handleMove(moveEvent) {
+          const currentX = moveEvent.touches ? moveEvent.touches[0].clientX : moveEvent.clientX;
+          const currentY = moveEvent.touches ? moveEvent.touches[0].clientY : moveEvent.clientY;
           
-          if (!isDragging && (Math.abs(dx) > dragThreshold || Math.abs(dy) > dragThreshold)) {
+          const dx = currentX - startX;
+          const dy = startY - currentY;
+          
+          if (!hasMoved && (Math.abs(dx) > dragThreshold || Math.abs(dy) > dragThreshold)) {
+            hasMoved = true;
             isDragging = true;
             el.classList.add('dragging');
           }
 
           if (isDragging) {
-            el.style.left = origX + dx + 'px';
-            el.style.top = origY + dy + 'px';
+            el.style.left = Math.max(0, Math.min(origX + dx, window.innerWidth - 120)) + 'px';
+            el.style.top = Math.max(0, Math.min(origY - dy, window.innerHeight - 120)) + 'px';
           }
-        };
+        }
 
-        const end = () => {
-          clearTimeout(longPressTimer);
-          document.removeEventListener('touchmove', move);
-          document.removeEventListener('touchend', end);
+        function handleEnd() {
+          // Remove event listeners
+          if (e.touches) {
+            document.removeEventListener('touchmove', handleMove);
+            document.removeEventListener('touchend', handleEnd);
+          } else {
+            document.removeEventListener('mousemove', handleMove);
+            document.removeEventListener('mouseup', handleEnd);
+          }
           
           if (isDragging) {
             el.classList.remove('dragging');
@@ -472,137 +552,102 @@
             render(el);
             const idx = umbrellas.findIndex(u => u.id == el.dataset.id);
             if (idx !== -1) saveUmbrella(umbrellas[idx]);
-          } else {
-            // Tap semplice - apri modal
-            const timeDiff = Date.now() - startTime;
-            if (timeDiff < 500) {
-              setTimeout(() => openModal(el), 100);
-            }
+          } else if (!hasMoved && Date.now() - startTime < 500) {
+            // È un tap/click semplice
+            setTimeout(() => openModal(el), 50);
           }
           
           setTimeout(() => {
             isDragging = false;
+            hasMoved = false;
           }, 100);
-        };
+        }
         
-        document.addEventListener('touchmove', move, { passive: false });
-        document.addEventListener('touchend', end, { passive: false });
-      }, { passive: false });
-
-      // Fallback per mouse (desktop)
-      if (!isTouch) {
-        el.addEventListener('click', e => {
-          if (e.target.closest('.delete-btn')) return;
-          if (el.classList.contains('dragging')) return;
-          openModal(el);
-        });
-
-        el.addEventListener('mousedown', e => {
-          if (e.target.closest('.delete-btn')) return;
-          
+        if (e.touches) {
+          document.addEventListener('touchmove', handleMove, { passive: false });
+          document.addEventListener('touchend', handleEnd);
+        } else {
           e.preventDefault();
-          startX = e.clientX;
-          startY = e.clientY;
-          const origX = parseInt(el.style.left);
-          const origY = parseInt(el.style.top);
-          isDragging = false;
+          document.addEventListener('mousemove', handleMove);
+          document.addEventListener('mouseup', handleEnd);
+        }
+      }
 
-          const move = ev => {
-            const dx = ev.clientX - startX;
-            const dy = ev.clientY - startY;
-            
-            if (!isDragging && (Math.abs(dx) > dragThreshold || Math.abs(dy) > dragThreshold)) {
-              isDragging = true;
-              el.classList.add('dragging');
-            }
+      function handleDelete() {
+        if (confirm('Sei sicuro di voler eliminare questo ombrellone?')) {
+          deleteUmbrella(el.dataset.id);
+        }
+      }
 
-            if (isDragging) {
-              el.style.left = origX + dx + 'px';
-              el.style.top = origY + dy + 'px';
-            }
-          };
-
-          const up = () => {
-            document.removeEventListener('mousemove', move);
-            document.removeEventListener('mouseup', up);
-            
-            if (isDragging) {
-              el.classList.remove('dragging');
-              el.dataset.mtime = Date.now();
-              updateData(el, true);
-              render(el);
-              const idx = umbrellas.findIndex(u => u.id == el.dataset.id);
-              if (idx !== -1) saveUmbrella(umbrellas[idx]);
-            }
-            
-            setTimeout(() => {
-              isDragging = false;
-            }, 100);
-          };
-          
-          document.addEventListener('mousemove', move);
-          document.addEventListener('mouseup', up);
-        });
+      // Aggiungi event listeners
+      if (isMobile) {
+        el.addEventListener('touchstart', handleStart, { passive: false });
+      } else {
+        el.addEventListener('mousedown', handleStart);
       }
     }
 
     function openModal(el) {
+      if (el.classList.contains('dragging')) return;
+      
       currentEl = el;
-      lettiniInput.value = el.dataset.lettini;
+      lettiniSelect.value = el.dataset.lettini;
       openCheckbox.checked = el.dataset.open === 'true';
       modalBackdrop.style.display = 'block';
       
       setTimeout(() => {
         positionModal(el);
-        lettiniInput.focus();
+        if (!isMobile) {
+          lettiniSelect.focus();
+        }
       }, 50);
     }
 
     function updateData(el, posOnly = false) {
       const idx = umbrellas.findIndex(u => u.id == el.dataset.id);
       if (idx === -1) return;
+      
       umbrellas[idx].x = parseInt(el.style.left);
       umbrellas[idx].y = parseInt(el.style.top);
       umbrellas[idx].mtime = parseInt(el.dataset.mtime);
+      
       if (!posOnly) {
         umbrellas[idx].lettini = el.dataset.lettini;
         umbrellas[idx].open = el.dataset.open === 'true';
       }
     }
 
-    // Creazione nuovi ombrelloni
-    map.addEventListener('touchend', e => {
+    // Creazione nuovi ombrelloni - gestione unificata
+    function handleMapClick(e) {
       if (e.target !== map) return;
-      if (e.changedTouches.length !== 1) return;
+      if (isDragging) return;
       
-      const touch = e.changedTouches[0];
+      const clientX = e.touches ? e.changedTouches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.changedTouches[0].clientY : e.clientY;
+      
       const rect = map.getBoundingClientRect();
-      const x = touch.clientX - rect.left;
-      const y = touch.clientY - rect.top;
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
 
       createNewUmbrella(x, y);
-    });
+    }
 
-    // Fallback per mouse
-    map.addEventListener('click', e => {
-      if (isTouch) return; // Evita doppio trigger su dispositivi touch
-      if (e.target !== map) return;
-
-      const rect = map.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-
-      createNewUmbrella(x, y);
-    });
+    if (isMobile) {
+      map.addEventListener('touchend', handleMapClick);
+    } else {
+      map.addEventListener('click', handleMapClick);
+    }
 
     function createNewUmbrella(x, y) {
       const id = Date.now() + Math.random();
+      const umbrellaSize = window.innerWidth <= 480 ? 100 : 120;
+      
       const data = {
         id,
         lettini: '2',
         open: false,
-        x: Math.max(0, Math.min(x - 70, window.innerWidth - 140)),
-        y: Math.max(0, Math.min(y - 70, window.innerHeight - 140)),
+        x: Math.max(0, Math.min(x - umbrellaSize/2, window.innerWidth - umbrellaSize)),
+        y: Math.max(0, Math.min(y - umbrellaSize/2, window.innerHeight - umbrellaSize)),
         mtime: Date.now()
       };
 
@@ -611,6 +656,7 @@
       saveUmbrella(data);
     }
 
+    // Event listeners per il modal
     cancelBtn.addEventListener('click', () => {
       modalBackdrop.style.display = 'none';
       currentEl = null;
@@ -618,18 +664,22 @@
 
     saveBtn.addEventListener('click', () => {
       if (!currentEl) return;
-      currentEl.dataset.lettini = lettiniInput.value || '2';
+      
+      currentEl.dataset.lettini = lettiniSelect.value;
       currentEl.dataset.open = openCheckbox.checked;
       currentEl.dataset.mtime = Date.now();
+      
       updateData(currentEl);
       render(currentEl);
+      
       const idx = umbrellas.findIndex(u => u.id == currentEl.dataset.id);
       if (idx !== -1) saveUmbrella(umbrellas[idx]);
+      
       modalBackdrop.style.display = 'none';
       currentEl = null;
     });
 
-    // Chiudi modal toccando il backdrop
+    // Chiudi modal cliccando sul backdrop
     modalBackdrop.addEventListener('click', e => {
       if (e.target === modalBackdrop) {
         modalBackdrop.style.display = 'none';
@@ -637,11 +687,7 @@
       }
     });
 
-    // Prevenire zoom su double tap del modal
-    editModal.addEventListener('touchend', e => {
-      e.preventDefault();
-    });
-
+    // Inizializza l'applicazione
     load();
   </script>
 </body>
