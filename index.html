@@ -2,27 +2,34 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gestione Ombrelloni Online</title>
   <style>
     body {
       margin: 0;
       font-family: sans-serif;
-      
+    }
+
+    #map-container {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+      overflow: hidden;
     }
 
     #map {
-  width: 100vw;
-  height: 100dvh; /* o 100vh se preferisci, ma 100dvh è più preciso su iOS */
-  position: absolute;
-  cursor: crosshair;
- background-image:   url('sfondo.jpg');
-  background-size: cover;
-  background-repeat: no-repeat;
-  background-position: center center;
-
-  
-}
-
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      background-image: url('sfondo.jpg');
+      background-size: cover;
+      background-repeat: no-repeat;
+      background-position: center center;
+      transform-origin: top left;
+      transition: transform 0.2s ease;
+    }
 
     .umbrella {
       width: 140px;
@@ -40,11 +47,11 @@
       background-color: gray;
       text-align: center;
       padding: 10px;
-      /* Forma esagonale usando clip-path */
       clip-path: polygon(30% 0%, 70% 0%, 100% 50%, 70% 100%, 30% 100%, 0% 50%);
       transition: transform 0.2s ease, box-shadow 0.2s ease, z-index 0.2s ease;
       user-select: none;
       touch-action: none;
+      transform-origin: center;
     }
 
     .umbrella:hover {
@@ -141,7 +148,9 @@
   </style>
 </head>
 <body>
-  <div id="map"></div>
+  <div id="map-container">
+    <div id="map"></div>
+  </div>
 
   <!-- Modal -->
   <div id="modal-backdrop">
@@ -175,6 +184,7 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
+    const mapContainer = document.getElementById('map-container');
     const map = document.getElementById('map');
     const modalBackdrop = document.getElementById('modal-backdrop');
     const editModal = document.getElementById('edit-modal');
@@ -185,6 +195,9 @@
 
     let currentEl = null;
     let umbrellas = [];
+    let scale = 1;
+    let offsetX = 0;
+    let offsetY = 0;
 
     function load() {
       onValue(ref(db, 'umbrellas'), snapshot => {
@@ -332,8 +345,8 @@
           }
 
           if (isDragging) {
-            el.style.left = origX + dx + 'px';
-            el.style.top = origY + dy + 'px';
+            el.style.left = (origX + dx) / scale + 'px';
+            el.style.top = (origY + dy) / scale + 'px';
           }
         };
 
@@ -365,8 +378,8 @@
     function updateData(el, posOnly = false) {
       const idx = umbrellas.findIndex(u => u.id == el.dataset.id);
       if (idx === -1) return;
-      umbrellas[idx].x = parseInt(el.style.left);
-      umbrellas[idx].y = parseInt(el.style.top);
+      umbrellas[idx].x = parseInt(el.style.left) * scale;
+      umbrellas[idx].y = parseInt(el.style.top) * scale;
       umbrellas[idx].mtime = parseInt(el.dataset.mtime);
       if (!posOnly) {
         umbrellas[idx].lettini = el.dataset.lettini;
@@ -375,26 +388,28 @@
     }
 
     // ✅ MODIFICATO QUI: compatibilità con WebView AppInventor
-    map.addEventListener('click', e => {
-      if (e.target !== map) return;
+    mapContainer.addEventListener('wheel', e => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.1 : 0.1;
+      const newScale = Math.max(0.5, Math.min(2, scale + delta));
+      const rect = mapContainer.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
 
-      const rect = map.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      const newOffsetX = offsetX - (mouseX - offsetX) * (newScale - scale) / scale;
+      const newOffsetY = offsetY - (mouseY - offsetY) * (newScale - scale) / scale;
 
-      const id = Date.now();
-      const data = {
-        id,
-        lettini: '2',
-        open: false,
-        x: x - 70,
-        y: y - 70,
-        mtime: Date.now()
-      };
+      map.style.transform = `translate(${newOffsetX}px, ${newOffsetY}px) scale(${newScale})`;
+      umbrellas.forEach(umbrella => {
+        const umbrellaEl = document.querySelector(`.umbrella[data-id="${umbrella.id}"]`);
+        if (umbrellaEl) {
+          umbrellaEl.style.transform = `translate(${newOffsetX}px, ${newOffsetY}px) scale(${newScale})`;
+        }
+      });
 
-      umbrellas.push(data);
-      createUmbrella(data);
-      saveUmbrella(data);
+      scale = newScale;
+      offsetX = newOffsetX;
+      offsetY = newOffsetY;
     });
 
     cancelBtn.onclick = () => {
