@@ -15,6 +15,7 @@
       height: 100vh;
       position: relative;
       overflow: hidden;
+      touch-action: none; /* Disabilita lo spostamento predefinito */
     }
 
     #map {
@@ -226,8 +227,8 @@
       el.dataset.lettini = data.lettini;
       el.dataset.open = data.open;
       el.dataset.mtime = data.mtime;
-      el.style.left = data.x + 'px';
-      el.style.top = data.y + 'px';
+      el.style.left = (data.x / scale) + 'px'; // Dividi per la scala attuale
+      el.style.top = (data.y / scale) + 'px'; // Dividi per la scala attuale
       map.appendChild(el);
       render(el);
     }
@@ -410,6 +411,53 @@
       scale = newScale;
       offsetX = newOffsetX;
       offsetY = newOffsetY;
+    });
+
+    // Aggiunta di touch event per pinch-to-zoom su dispositivi touch
+    let touchStart = null;
+    let touchEnd = null;
+
+    mapContainer.addEventListener('touchstart', e => {
+      if (e.touches.length === 2) {
+        touchStart = [
+          { x: e.touches[0].clientX, y: e.touches[0].clientY },
+          { x: e.touches[1].clientX, y: e.touches[1].clientY }
+        ];
+      }
+    });
+
+    mapContainer.addEventListener('touchmove', e => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        touchEnd = [
+          { x: e.touches[0].clientX, y: e.touches[1].clientY },
+          { x: e.touches[1].clientX, y: e.touches[1].clientY }
+        ];
+
+        const startDistance = Math.hypot(touchStart[0].x - touchStart[1].x, touchStart[0].y - touchStart[1].y);
+        const endDistance = Math.hypot(touchEnd[0].x - touchEnd[1].x, touchEnd[0].y - touchEnd[1].y);
+        const delta = endDistance - startDistance;
+        const newScale = Math.max(0.5, Math.min(2, scale + delta * 0.001));
+
+        const rect = mapContainer.getBoundingClientRect();
+        const centerX = (touchStart[0].x + touchStart[1].x) / 2 - rect.left;
+        const centerY = (touchStart[0].y + touchStart[1].y) / 2 - rect.top;
+
+        const newOffsetX = offsetX - (centerX - offsetX) * (newScale - scale) / scale;
+        const newOffsetY = offsetY - (centerY - offsetY) * (newScale - scale) / scale;
+
+        map.style.transform = `translate(${newOffsetX}px, ${newOffsetY}px) scale(${newScale})`;
+        umbrellas.forEach(umbrella => {
+          const umbrellaEl = document.querySelector(`.umbrella[data-id="${umbrella.id}"]`);
+          if (umbrellaEl) {
+            umbrellaEl.style.transform = `translate(${newOffsetX}px, ${newOffsetY}px) scale(${newScale})`;
+          }
+        });
+
+        scale = newScale;
+        offsetX = newOffsetX;
+        offsetY = newOffsetY;
+      }
     });
 
     cancelBtn.onclick = () => {
