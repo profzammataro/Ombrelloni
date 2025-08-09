@@ -22,6 +22,8 @@
       position: fixed;
       width: 100%;
       height: 100%;
+      transform-origin: 0 0;
+      transform: scale(var(--scale-factor, 1));
     }
 
     #map {
@@ -31,7 +33,7 @@
       position: absolute;
       cursor: crosshair;
       background-image: url('sfondo.jpg');
-      background-size: relative;
+      background-size: contain;
       background-repeat: no-repeat;
       background-position: center center;
       touch-action: manipulation;
@@ -295,7 +297,7 @@
       }
     }
 
-    /* Prevenire zoom accidentalissimo */
+    /* Prevenire zoom accidentale */
     * {
       touch-action: manipulation;
     }
@@ -415,6 +417,14 @@
       el.dataset.mtime = data.mtime;
       el.style.left = data.x + 'px';
       el.style.top = data.y + 'px';
+      
+      // Applica la scala corrente all'ombrellone appena creato
+      const currentScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--scale-factor')) || 1;
+      const baseSize = 120;
+      const scaledSize = baseSize * currentScale;
+      el.style.width = scaledSize + 'px';
+      el.style.height = scaledSize + 'px';
+      
       map.appendChild(el);
       render(el);
     }
@@ -640,14 +650,15 @@
 
     function createNewUmbrella(x, y) {
       const id = Date.now() + Math.random();
-      const umbrellaSize = window.innerWidth <= 480 ? 100 : 120;
+      const currentScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--scale-factor')) || 1;
+      const umbrellaSize = 120 * currentScale;
       
       const data = {
         id,
         lettini: '2',
         open: false,
-        x: Math.max(0, Math.min(x - umbrellaSize/2, window.innerWidth - umbrellaSize)),
-        y: Math.max(0, Math.min(y - umbrellaSize/2, window.innerHeight - umbrellaSize)),
+        x: Math.max(0, Math.min(x - umbrellaSize/2, (window.innerWidth / currentScale) - 120)),
+        y: Math.max(0, Math.min(y - umbrellaSize/2, (window.innerHeight / currentScale) - 120)),
         mtime: Date.now()
       };
 
@@ -687,7 +698,48 @@
       }
     });
 
-    // Inizializza l'applicazione
+    // Funzione per calcolare e applicare il fattore di scala
+    function calculateScale() {
+      const referenceWidth = 1200; // Larghezza di riferimento per il design
+      const referenceHeight = 800;  // Altezza di riferimento per il design
+      
+      const screenWidth = window.innerWidth;
+      const screenHeight = window.innerHeight;
+      
+      // Calcola il fattore di scala basato sulla dimensione più piccola
+      const scaleX = screenWidth / referenceWidth;
+      const scaleY = screenHeight / referenceHeight;
+      const scaleFactor = Math.min(scaleX, scaleY, 1); // Non ingrandire oltre 100%
+      
+      // Applica il fattore di scala al body
+      document.documentElement.style.setProperty('--scale-factor', scaleFactor);
+      
+      // Aggiorna le dimensioni degli ombrelloni se necessario
+      const umbrellaElements = document.querySelectorAll('.umbrella');
+      umbrellaElements.forEach(el => {
+        const baseSize = 120;
+        const scaledSize = baseSize * scaleFactor;
+        el.style.width = scaledSize + 'px';
+        el.style.height = scaledSize + 'px';
+      });
+      
+      return scaleFactor;
+    }
+
+    // Applica il ridimensionamento all'avvio e quando cambia l'orientamento
+    function initializeScale() {
+      const scaleFactor = calculateScale();
+      console.log('Scale factor applied:', scaleFactor);
+    }
+
+    // Event listener per il ridimensionamento della finestra
+    window.addEventListener('resize', calculateScale);
+    window.addEventListener('orientationchange', () => {
+      setTimeout(calculateScale, 300); // Delay per permettere il completamento del cambio orientamento
+    });
+
+    // Inizializza scala e app
+    initializeScale();
     load();
   </script>
 </body>
