@@ -30,13 +30,24 @@
       height: 100dvh;
       position: absolute;
       cursor: crosshair;
-      background-image: url('sfondo.jpg');
-      background-size: max(100vw, 100vh);
-      background-repeat: no-repeat;
-      background-position: center center;
       touch-action: manipulation;
       -webkit-user-select: none;
       user-select: none;
+      overflow: hidden;
+    }
+
+    #background-img {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      object-position: center center;
+      z-index: -1;
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-select: none;
     }
 
     .umbrella {
@@ -307,7 +318,9 @@
   </style>
 </head>
 <body>
-  <div id="map"></div>
+  <div id="map">
+    <img id="background-img" src="sfondo.jpg" alt="Sfondo">
+  </div>
 
   <!-- Modal -->
   <div id="modal-backdrop">
